@@ -12,6 +12,7 @@ for script in "$ROOT/runtime/setup_micro_glibc.sh" "$ROOT/scripts/import_and_pat
     bash -n "$script"
 done
 sh -n "$ROOT/scripts/enter_headless.sh"
+sh -n "$ROOT/scripts/android_preflight.sh"
 
 gcc -std=c11 -O1 -g -pthread -Wall -Wextra -Werror \
     -fsanitize=address,undefined -fno-omit-frame-pointer \

@@ -373,6 +373,84 @@ class ProjectArtifactTests(unittest.TestCase):
         self.assertNotIn("thermal-engine", script)
         self.assertIn("$0 restore", script)
 
+    def test_android_preflight_is_read_only_and_reports_allowlisted_data(self) -> None:
+        script = ROOT / "scripts/android_preflight.sh"
+        source = script.read_text(encoding="utf-8")
+        for command in ("dd ", "mkfs", "fastboot", "reboot", "blockdev --set", "mount ", "umount "):
+            self.assertNotIn(command, source)
+        self.assertNotIn("ro.serialno", source)
+        self.assertNotIn("user_keys", source)
+        self.assertNotIn("password", source.lower())
+
+        with tempfile.TemporaryDirectory(prefix="op13-preflight-") as temp:
+            root = Path(temp)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            props = fake_bin / "getprop"
+            props.write_text(
+                "#!/bin/sh\n"
+                "case \"${1:-}\" in\n"
+                "  ro.product.device) echo dodge ;;\n"
+                "  ro.board.platform) echo sm8750 ;;\n"
+                "  ro.boot.slot_suffix) echo _b ;;\n"
+                "  ro.crypto.state) echo encrypted ;;\n"
+                "  ro.crypto.type) echo file ;;\n"
+                "  ro.crypto.metadata.enabled) echo true ;;\n"
+                "  *) echo ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            props.chmod(0o755)
+            blockdev = fake_bin / "blockdev"
+            blockdev.write_text(
+                "#!/bin/sh\n"
+                "case \"$1\" in\n"
+                "  --getsize64) wc -c < \"$2\" | tr -d '[:space:]' ;;\n"
+                "  --getro) echo 0 ;;\n"
+                "  *) exit 2 ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            blockdev.chmod(0o755)
+            df = fake_bin / "df"
+            df.write_text(
+                "#!/bin/sh\n"
+                "printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\\n'\n"
+                "printf '/dev/test 100000 10000 90000 10%% /data\\n'\n",
+                encoding="utf-8",
+            )
+            df.chmod(0o755)
+
+            partitions = root / "by-name"
+            partitions.mkdir()
+            boot_b = partitions / "boot_b"
+            boot_b.write_bytes(b"boot image test fixture")
+            mapper = root / "mapper"
+            mapper.mkdir()
+            (mapper / "system_a").symlink_to(boot_b)
+            before = {path.name: path.read_bytes() for path in partitions.iterdir()}
+            result = subprocess.run(
+                ["sh", str(script)],
+                env={
+                    **os.environ,
+                    "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                    "PARTITION_DIR": str(partitions),
+                    "MAPPER_DIR": str(mapper),
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("mode=read-only", result.stdout)
+            self.assertIn("secrets_collected=false", result.stdout)
+            self.assertIn("property.ro.boot.slot_suffix=_b", result.stdout)
+            self.assertIn("property.ro.crypto.state=encrypted", result.stdout)
+            self.assertIn("data.available_kb=90000", result.stdout)
+            self.assertIn("partition.boot_b.size_bytes=23", result.stdout)
+            self.assertIn("mapper.system_a.size_bytes=23", result.stdout)
+            self.assertEqual(before, {path.name: path.read_bytes() for path in partitions.iterdir()})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -12,8 +12,11 @@ The module has been reworked into a **read-only preview** and rebuilt from `modu
 - boot service does not run an automatic guardian;
 - the web page is static, has no root bridge or remote JavaScript, and reports no simulated success;
 - the package install script identifies itself as preview-only.
+- it does **not** disable the Android OTA updater; OTA blocking is only part of the proposed design.
 
 The preview module is not an installer and must not be used as a device protection mechanism. Re-enabling device operations requires device-specific implementation, recovery procedures, and hardware testing.
+
+The intended boot design is documented in [`docs/BOOT_FLOW.md`](docs/BOOT_FLOW.md): A remains Android, B will eventually boot a LineageOS-derived kernel, Android performs its normal credential unlock, then glibc Linux takes over. This is a proposed flow only. Android unlock integration, lock-screen UI, Linux handoff, Wayland, and OTA suppression are not implemented.
 
 ## Changes in the hardening pass
 
@@ -22,6 +25,7 @@ The preview module is not an installer and must not be used as a device protecti
 - Reduced `scripts/enter_headless.sh` to stopping selected Android services and saving which were running. CPU/GPU/thermal/swap/sysctl changes and broad process kills were removed. Restore is best-effort and only starts saved services.
 - Reframed `runtime/setup_micro_glibc.sh` as a staging helper for an existing AArch64 glibc tree; it fails when the loader or libc is missing and refuses to overwrite a populated destination by default.
 - Added maintainable module sources and deterministic ZIP packaging via `scripts/package_module.py`.
+- Added `docs/BOOT_FLOW.md` and `scripts/android_preflight.sh` as the first implementation phase: capture non-secret device facts before designing the Android unlock/handoff. The preflight has no partition-write or key-reading path.
 - Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. GitHub Actions remains disabled in repository settings; the workflow is ready for manual enabling.
 
 ## Tests
@@ -40,7 +44,7 @@ This includes:
 - static checks that the preview module has no partition-write operations or simulated WebUI controls;
 - C build with `-Wall -Wextra -Werror`, AddressSanitizer and UndefinedBehaviorSanitizer, followed by runtime checks for System V IPC cleanup, clock/syscall calls, actual allowed CPU affinity and exact atomic count, and full GEMM result correctness.
 
-Last run passed: **15 Python tests**, synthetic patch fixtures, module ZIP rebuild/validation, shell syntax checks, and the sanitized C test binary. Environment: Linux x86_64, GCC 16.2, glibc 2.44, 4 allowed CPUs. This validates host-side behavior only. It does not check Android/Bionic, ARM64 performance, kernel compilation, GKI KMI, boot/recovery, OTA safety, temperatures, GPU, NPU, or device-specific partitions.
+Last run passed: **16 Python tests**, synthetic patch fixtures, module ZIP rebuild/validation, shell syntax checks, and the sanitized C test binary. Environment: Linux x86_64, GCC 16.2, glibc 2.44, 4 allowed CPUs. This validates host-side behavior only. The Android preflight has not been run on the target phone. No unlock, handoff, OTA blocking, or partition modification is implemented.
 
 `python3 tests/verify_kernel_patches.py --kernel-tree PATH` checks textual patch applicability against a real checkout without calling that a successful build. Its default synthetic fixture is deliberately not described as a LineageOS tree.
 

@@ -6,10 +6,11 @@ The repository contains kernel patches, Kconfig settings, host/device scripts, a
 
 ## Current safety limits
 
-- The module ZIP is a **read-only preview**. Its backend reports limited status; install, OTA, restore, reboot, and slot-switch operations are disabled. The web page is static and does not run shell commands.
+- The module ZIP is a **read-only preview**. Its backend reports limited status; install, restore, reboot, and slot-switch operations are disabled. The web page is static and does not run shell commands. **It does not block Android's existing OTA updater.**
 - `post-fs-data.sh` no longer changes block-device flags; the service does not auto-run the slot guardian.
 - KernelSU setup and the thermal-bypass patch are opt-in. The importer fails on patch conflicts instead of printing a false success. Kconfig changes are idempotent and conflicting values require explicit review.
 - `enter_headless.sh` stops only selected Android services that were running and records them for a best-effort restore. It does not modify CPU/GPU clocks, thermal policy, swap, or sysctls. It can still stop the local Android UI; maintain ADB access and inspect the script first.
+- The proposed A=Android / B=Linux boot flow is recorded in [`docs/BOOT_FLOW.md`](docs/BOOT_FLOW.md). Android encryption unlock, lock-screen handoff, Linux pivot, and OTA blocking are **not implemented**.
 - The thermal bypass patch remains in the repository for review but is **not recommended** and is not applied by default.
 
 These safeguards do not make the project device-ready. In particular, patch applicability is not kernel compilation, and a successful host test says nothing about the boot chain, OTA, GPU/NPU, or recovery.
@@ -38,6 +39,8 @@ This is still not a build or a KMI/runtime validation.
 - `scripts/import_and_patch_lineageos.sh` — clones the selected LineageOS kernel branch and applies the default patch/config set.
 - `scripts/merge_kconfig.py` — idempotent Kconfig merge with explicit conflict handling.
 - `scripts/enter_headless.sh` — limited Android service stop/restore helper.
+- `scripts/android_preflight.sh` — read-only inventory of selected Android properties, `/data` mount/capacity and fstab flags, filesystem availability, and visible physical/logical partition nodes. It does not read key blobs or modify the device.
+- `docs/BOOT_FLOW.md` — accepted architecture and implementation gates.
 - `runtime/setup_micro_glibc.sh` — stages an **already-built** AArch64 glibc directory. It does not build or download glibc, and refuses to overwrite a non-empty destination unless `OVERWRITE=1` is explicitly set.
 - `tests/advanced_suite.c` — IPC lifecycle, timing, CPU affinity/atomic-count, and GEMM correctness smoke tests plus non-portable benchmarks.
 - `module-src/` — editable, fail-closed preview module sources.
@@ -67,6 +70,17 @@ KSU_SETUP_SHA256='<64-hex-digest>' \
 ```
 
 Do not enable `ENABLE_THERMAL_BYPASS=1` on a device. No flashing instructions are provided because no boot image or recovery procedure has been validated.
+
+## First device-side step: read-only inventory
+
+After reviewing the script, copy it to a temporary path and run it on the target ROM:
+
+```bash
+adb push scripts/android_preflight.sh /data/local/tmp/
+adb shell su -c 'sh /data/local/tmp/android_preflight.sh'
+```
+
+The script itself only reads. `adb push` places the script in `/data/local/tmp`; the report intentionally omits serial numbers, credentials, and encryption keys. Review the output before sharing it.
 
 ## License
 
