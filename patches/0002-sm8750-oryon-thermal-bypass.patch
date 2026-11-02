@@ -1,0 +1,31 @@
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index 627b7ac..6376388 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -2,6 +2,10 @@ static DEFINE_MUTEX(thermal_list_lock);
+ static DEFINE_MUTEX(thermal_governor_lock);
+ static atomic_t in_suspend;
+ 
++static bool sm8750_headless_thermal_bypass __read_mostly = false;
++module_param_named(headless_thermal_bypass, sm8750_headless_thermal_bypass, bool, 0644);
++MODULE_PARM_DESC(headless_thermal_bypass, "Bypass passive/soft thermal frequency throttling on SM8750 Oryon");
++
+ static void handle_thermal_trip(struct thermal_zone_device *tz,
+                                 const struct thermal_trip *trip)
+ {
+@@ -10,6 +14,15 @@ static void handle_thermal_trip(struct thermal_zone_device *tz,
+         if (trip->temperature == THERMAL_TEMP_INVALID)
+                 return;
+ 
++        /* Allow sustained 4.32GHz/3.53GHz Oryon operation under external cooling
++         * while strictly preserving CRITICAL/HOT hardware safety trips.
++         */
++        if (unlikely(sm8750_headless_thermal_bypass) &&
++            trip->type != THERMAL_TRIP_CRITICAL &&
++            trip->type != THERMAL_TRIP_HOT) {
++                return;
++        }
++
+         if (tz->last_temperature != THERMAL_TEMP_INVALID) {
+                 if (tz->last_temperature < trip->temperature &&
+                     tz->temperature >= trip->temperature)

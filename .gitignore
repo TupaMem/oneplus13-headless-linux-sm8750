@@ -1,0 +1,9 @@
+kernel_workspace/
+micro_glibc_root/
+__pycache__/
+*.py[cod]
+*.o
+*.out
+.env
+.env.*
+!.env.example

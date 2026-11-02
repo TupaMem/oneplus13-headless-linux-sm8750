@@ -1,0 +1,45 @@
+name: SM8750 LineageOS 23.2 Kernel Patch & Micro-Glibc CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  verify-and-test:
+    name: Patch LineageOS 23.2 SM8750 Kernel & Test Micro-Glibc (ARM64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout Project Repository
+        uses: actions/checkout@v4
+
+      - name: Install Build & Verification Toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang lld llvm patchelf bc bison flex libssl-dev
+
+      - name: Clone LineageOS OnePlus 13 (SM8750) Kernel (lineage-23.2 / Android 16)
+        run: |
+          git clone --depth=1 -b lineage-23.2 https://github.com/LineageOS/android_kernel_oneplus_sm8750.git kernel_workspace/kernel
+
+      - name: Apply Headless Linux & Native Glibc Patches
+        run: |
+          BRANCH=lineage-23.2 ENABLE_KSU=1 ./scripts/import_and_patch_lineageos.sh
+          python3 ./tests/verify_kernel_patches.py
+
+      - name: Setup Isolated Micro-Glibc Runtime (Zero-Distro)
+        run: |
+          export GLIBC_ROOT="$(pwd)/micro_glibc_root"
+          ./runtime/setup_micro_glibc.sh
+          cp -L /lib/aarch64-linux-gnu/ld-linux-aarch64.so.1 "$GLIBC_ROOT/lib64/"
+          cp -L /lib/aarch64-linux-gnu/libc.so.6 "$GLIBC_ROOT/lib64/"
+          cp -L /lib/aarch64-linux-gnu/libm.so.6 "$GLIBC_ROOT/lib64/"
+          cp -L /lib/aarch64-linux-gnu/libpthread.so.0 "$GLIBC_ROOT/lib64/" || true
+
+      - name: Compile & Execute Advanced Kernel + Micro-Glibc Benchmark Suite
+        run: |
+          export GLIBC_ROOT="$(pwd)/micro_glibc_root"
+          gcc -O3 -pthread -Wall -Wextra tests/advanced_suite.c -o "$GLIBC_ROOT/bin/advanced_suite"
+          "$GLIBC_ROOT/bin/glibc-run" "$GLIBC_ROOT/bin/advanced_suite"
