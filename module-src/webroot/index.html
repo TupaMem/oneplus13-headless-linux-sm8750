@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>OP13 DualBoot Manager — Preview</title>
+  <style>
+    :root { color-scheme: dark; font: 16px/1.55 system-ui, sans-serif; }
+    body { max-width: 760px; margin: 8vh auto; padding: 0 1.25rem; background: #0b1220; color: #e5edf8; }
+    main { padding: 2rem; border: 1px solid #334155; border-radius: 1rem; background: #111c2e; }
+    h1 { margin-top: 0; color: #7dd3fc; }
+    .warning { padding: 1rem; border-left: 4px solid #f59e0b; background: #292315; }
+    code { color: #a7f3d0; }
+    a { color: #7dd3fc; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>OnePlus 13 DualBoot Manager</h1>
+    <p><strong>Read-only preview.</strong> This page is not connected to Android, KernelSU, Magisk, or a root shell.</p>
+    <div class="warning">
+      Device writes, OTA installation, partition backups, slot switching, reboot,
+      GPU tuning, and CPU tuning are disabled in this build. No simulated success
+      status is shown.
+    </div>
+    <h2>Validation status</h2>
+    <ul>
+      <li>The module has not been tested on a OnePlus 13.</li>
+      <li>Boot images, OTA packages, and a Linux root filesystem are not included.</li>
+      <li>Host tests do not validate boot-chain, recovery, thermal, GPU, or OTA behavior.</li>
+    </ul>
+    <p>Review <code>PROJECT_STATUS.md</code> in the source repository before use.</p>
+  </main>
+</body>
+</html>

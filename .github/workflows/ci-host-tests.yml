@@ -1,0 +1,23 @@
+name: Host tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Offline tests (host only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run unit, artifact, shell syntax, sanitizer, and C runtime tests
+        run: bash tests/run_tests.sh

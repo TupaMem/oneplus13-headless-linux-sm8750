@@ -1,65 +1,98 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# setup_micro_glibc.sh
-# Builds and configures a zero-distro Micro-Glibc Runtime (< 25 MB)
-# Supports both:
-#   1) On-device Android 16 EROFS bypass via /dev/shm/rootfs + mount namespaces
-#   2) Transparent ELF execution via binfmt_misc or patchelf / LD_LIBRARY_PATH
-# ==============================================================================
+# Stage an already-built glibc runtime. This script does not build or download glibc.
 set -euo pipefail
 
+: "${GLIBC_SOURCE:?Set GLIBC_SOURCE to a directory containing lib64/ld-linux-aarch64.so.1 and libc.so.6}"
 GLIBC_ROOT="${GLIBC_ROOT:-/data/glibc}"
-SHM_ROOTFS="${SHM_ROOTFS:-/dev/shm/micro_glibc_rootfs}"
-
-echo "[*] Initializing Micro-Glibc directory structure at ${GLIBC_ROOT}..."
-mkdir -p "${GLIBC_ROOT}/lib64"          "${GLIBC_ROOT}/etc"          "${GLIBC_ROOT}/bin"          "${GLIBC_ROOT}/shm"
-
-# Configure static low-latency DNS & NSSwitch (bypasses Android netd/dnsproxyd)
-cat << 'EOF' > "${GLIBC_ROOT}/etc/resolv.conf"
-nameserver 1.1.1.1
-nameserver 8.8.8.8
-options timeout:1 attempts:2
-EOF
-
-cat << 'EOF' > "${GLIBC_ROOT}/etc/nsswitch.conf"
-hosts:      files dns
-networks:   files
-passwd:     files
-group:      files
-shadow:     files
-EOF
-
-cat << 'EOF' > "${GLIBC_ROOT}/etc/passwd"
-root:x:0:0:root:/data/glibc:/bin/sh
-EOF
-
-cat << 'EOF' > "${GLIBC_ROOT}/etc/group"
-root:x:0:
-inet:x:3003:root
-sdcard_rw:x:1015:root
-EOF
-
-# Create the transparent Glibc ELF Launcher wrapper
-cat << 'EOF' > "${GLIBC_ROOT}/bin/glibc-run"
-#!/bin/sh
-GLIBC_ROOT="${GLIBC_ROOT:-/data/glibc}"
-LOADER=""
-for candidate in     "${GLIBC_ROOT}/lib64/ld-linux-aarch64.so.1"     "${GLIBC_ROOT}/lib64/ld-linux-x86-64.so.2"     "/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1"     "/lib64/ld-linux-x86-64.so.2"; do
-    if [ -x "$candidate" ]; then
-        LOADER="$candidate"
-        break
-    fi
+OVERWRITE="${OVERWRITE:-0}"
+while [[ "$GLIBC_ROOT" != "/" && "$GLIBC_ROOT" == */ ]]; do
+    GLIBC_ROOT="${GLIBC_ROOT%/}"
 done
+SOURCE_LIB="${GLIBC_SOURCE%/}/lib64"
+TARGET_LIB="${GLIBC_ROOT%/}/lib64"
 
-if [ -z "$LOADER" ]; then
-    echo "[!] Error: No compatible glibc dynamic linker found in ${GLIBC_ROOT}/lib64" >&2
+case "$GLIBC_ROOT" in
+    /|/data|/system|/vendor|/product|/apex|"")
+        echo "[!] Refusing unsafe GLIBC_ROOT: $GLIBC_ROOT" >&2
+        exit 2
+        ;;
+    /*) ;;
+    *)
+        echo "[!] GLIBC_ROOT must be an absolute path." >&2
+        exit 2
+        ;;
+esac
+case "$OVERWRITE" in
+    0|1) ;;
+    *)
+        echo "[!] OVERWRITE must be 0 or 1." >&2
+        exit 2
+        ;;
+esac
+case "$GLIBC_ROOT" in
+    *[!A-Za-z0-9._/-]*|*/../*|*/..|*/./*|*/.)
+        echo "[!] GLIBC_ROOT contains unsupported or traversal characters." >&2
+        exit 2
+        ;;
+esac
+
+LOADER="$SOURCE_LIB/ld-linux-aarch64.so.1"
+if [ ! -x "$LOADER" ] || [ ! -f "$SOURCE_LIB/libc.so.6" ]; then
+    echo "[!] GLIBC_SOURCE is incomplete: expected executable $LOADER and libc.so.6." >&2
     exit 1
 fi
 
-export LD_LIBRARY_PATH="${GLIBC_ROOT}/lib64:/vendor/lib64:${LD_LIBRARY_PATH:-}"
-export RESOLV_HOST_CONF="${GLIBC_ROOT}/etc/resolv.conf"
-exec "$LOADER" --library-path "${GLIBC_ROOT}/lib64" "$@"
-EOF
-chmod +x "${GLIBC_ROOT}/bin/glibc-run"
+if [ -e "$GLIBC_ROOT" ]; then
+    if [ -L "$GLIBC_ROOT" ] || [ ! -d "$GLIBC_ROOT" ]; then
+        echo "[!] GLIBC_ROOT exists but is not a regular directory: $GLIBC_ROOT" >&2
+        exit 1
+    fi
+    if [ -n "$(find "$GLIBC_ROOT" -mindepth 1 -maxdepth 1 -print -quit)" ] && [ "$OVERWRITE" != "1" ]; then
+        echo "[!] GLIBC_ROOT is not empty; set OVERWRITE=1 only after reviewing its contents." >&2
+        exit 1
+    fi
+fi
 
-echo "[+] Micro-Glibc Runtime initialized at ${GLIBC_ROOT}."
+if command -v readelf >/dev/null 2>&1; then
+    MACHINE="$(readelf -h "$LOADER" | awk -F: '/Machine:/ { sub(/^[[:space:]]+/, "", $2); print $2; exit }')"
+    case "$MACHINE" in
+        AArch64*) ;;
+        *)
+            echo "[!] Expected an AArch64 glibc loader, found: ${MACHINE:-unknown}" >&2
+            exit 1
+            ;;
+    esac
+fi
+
+echo "[*] Staging existing AArch64 glibc files in $GLIBC_ROOT (no download/build)."
+mkdir -p "$TARGET_LIB" "$GLIBC_ROOT/etc" "$GLIBC_ROOT/bin" "$GLIBC_ROOT/shm"
+cp -a "$SOURCE_LIB/." "$TARGET_LIB/"
+
+cat > "$GLIBC_ROOT/etc/nsswitch.conf" <<'EOF'
+hosts: files dns
+networks: files
+passwd: files
+group: files
+shadow: files
+EOF
+
+cat > "$GLIBC_ROOT/etc/passwd" <<'EOF'
+root:x:0:0:root:/root:/bin/sh
+EOF
+cat > "$GLIBC_ROOT/etc/group" <<'EOF'
+root:x:0:
+EOF
+
+cat > "$GLIBC_ROOT/bin/glibc-run" <<'EOF'
+#!/system/bin/sh
+GLIBC_ROOT="${GLIBC_ROOT:-/data/glibc}"
+LOADER="$GLIBC_ROOT/lib64/ld-linux-aarch64.so.1"
+if [ ! -x "$LOADER" ]; then
+    echo "[!] AArch64 glibc loader not found: $LOADER" >&2
+    exit 1
+fi
+exec "$LOADER" --library-path "$GLIBC_ROOT/lib64" "$@"
+EOF
+chmod 0755 "$GLIBC_ROOT/bin/glibc-run"
+
+echo "[+] Runtime files staged. This does not prove ABI compatibility with Android vendor libraries."

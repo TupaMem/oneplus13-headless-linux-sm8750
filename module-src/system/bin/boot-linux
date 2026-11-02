@@ -1,0 +1,2 @@
+#!/system/bin/sh
+exec /system/bin/op13-slot-guardian reboot-other-slot

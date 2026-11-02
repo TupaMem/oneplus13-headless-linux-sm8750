@@ -1,0 +1,29 @@
+#!/sbin/sh
+umask 022
+ui_print() { echo "$1"; }
+require_new_magisk() {
+  ui_print "**********************************"
+  ui_print " Please install Magisk v20.4+ or KernelSU / APatch! "
+  ui_print "**********************************"
+  exit 1
+}
+OUTFD=$2
+ZIPFILE=$3
+mount /data 2>/dev/null
+[ -f /data/adb/magisk/util_functions.sh ] && . /data/adb/magisk/util_functions.sh
+[ -f /data/adb/ksu/bin/busybox ] && export PATH="/data/adb/ksu/bin:$PATH"
+[ -f /data/adb/ap/bin/busybox ] && export PATH="/data/adb/ap/bin:$PATH"
+
+# If running under standard Magisk/KSU util_functions, use install_module; else manual extract
+if type install_module >/dev/null 2>&1; then
+  install_module
+  exit 0
+else
+  MODID="op13_dualboot_manager"
+  MODPATH="/data/adb/modules/${MODID}"
+  rm -rf "$MODPATH"
+  mkdir -p "$MODPATH"
+  unzip -o "$ZIPFILE" -x 'META-INF/*' -d "$MODPATH"
+  sh "$MODPATH/customize.sh"
+  exit 0
+fi

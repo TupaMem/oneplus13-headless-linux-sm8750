@@ -1,0 +1,19 @@
+#!/system/bin/sh
+# Read-only slot status stub. Automatic partition protection, backup/restore,
+# and reboot operations are disabled until verified on real OnePlus 13 builds.
+set -u
+
+ACTION="${1:-status}"
+case "$ACTION" in
+    status)
+        exec "${0%/*}/op13-updater-engine" status
+        ;;
+    auto|reboot-other-slot|snapshot-slot-b)
+        echo "[!] '$ACTION' is disabled in this preview build; no partition writes are supported." >&2
+        exit 3
+        ;;
+    *)
+        echo "Usage: $0 {status|auto|reboot-other-slot|snapshot-slot-b}" >&2
+        exit 2
+        ;;
+esac

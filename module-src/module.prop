@@ -1,0 +1,6 @@
+id=op13_dualboot_manager
+name=OP13 DualBoot Manager (Preview Only)
+version=v2.1.0-preview
+versionCode=210
+author=OP13-Headless-Linux
+description=Read-only preview for OnePlus 13. Device writes, OTA, slot switching, reboot and automatic partition protection are disabled. Not a usable dual-boot installer.

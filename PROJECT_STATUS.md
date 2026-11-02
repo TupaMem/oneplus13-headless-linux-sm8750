@@ -1,82 +1,56 @@
-# Статус проекта при публикации
+# Project status and validation limits
 
-## Что находится в репозитории
+## Current state
 
-Импорт `oneplus13-headless-linux-full-project.zip`: два патча ядра,
-Kconfig-фрагмент, скрипты импорта ядра и headless-режима, генератор обёртки
-glibc, C-бенчмарк, Python-валидатор, workflow и ZIP модуля Magisk/KernelSU.
-Самих исходников ядра, glibc, загрузочных образов и rootfs в архиве нет.
+This is an experimental source repository, not a validated OnePlus 13 dual-boot solution. The original uploaded archive contained a corrupted `.git` directory, which was not imported. The repository has a fresh Git history.
 
-Исходные код и ZIP сохранены без исправления функциональной логики.
-Добавлены предупреждения, этот файл и `.gitignore`; исправлена ссылка
-клонирования и выставлены executable-биты трём shell-скриптам проекта.
-Повреждённая `.git` из архива не импортирована: `git fsck --full` обнаружил
-отсутствующий HEAD/коммит и blob-объекты. Публичная история начинается заново.
+The module has been reworked into a **read-only preview** and rebuilt from `module-src/`:
 
-## Что реально проверено локально
+- updater commands that would write partitions, change slots, reboot, install Linux, restore images, or flash OTA now fail closed;
+- the slot guardian is a status/disabled-operation stub;
+- the early boot hook does not set block devices read-only;
+- boot service does not run an automatic guardian;
+- the web page is static, has no root bridge or remote JavaScript, and reports no simulated success;
+- the package install script identifies itself as preview-only.
 
-Среда проверки: Linux x86_64, glibc 2.44, 4 доступных online CPU;
-это **не OnePlus 13 и не ARM64**.
+The preview module is not an installer and must not be used as a device protection mechanism. Re-enabling device operations requires device-specific implementation, recovery procedures, and hardware testing.
 
-| Проверка | Результат | Ограничение |
-| --- | --- | --- |
-| `python tests/verify_kernel_patches.py` | PASS | Применение к искусственно созданным файлам, не к дереву LineageOS |
-| `gcc -O3 -pthread -Wall -Wextra -Werror tests/advanced_suite.c -o /tmp/op13-suite` | PASS | Компиляция на x86_64 |
-| Запуск скомпилированного бенчмарка | Все 5 тестов завершились с PASS | Не проверяет загрузку устройства, GPU, NPU, KMI или OTA |
-| Синтаксис 3 shell-скриптов проекта и 9 скриптов внутри ZIP | PASS | Только `bash -n` / `sh -n`, без исполнения |
-| CRC ZIP модуля | PASS | Не подтверждает возможность установки |
-| Поиск распространённых шаблонов токенов и приватных ключей в файлах и ZIP | Совпадений нет | Эвристическая проверка, не гарантия отсутствия секретов |
+## Changes in the hardening pass
 
-Скрипты управления устройством, прошивка, KernelSU installer и workflow не запускались.
-Ядро и реальная ветка LineageOS не собирались и не проверялись.
+- Added `scripts/merge_kconfig.py`: idempotent Kconfig merge, conflicting assignments rejected by default, explicit override flag, atomic file replacement.
+- Hardened `scripts/import_and_patch_lineageos.sh`: KernelSU and thermal bypass disabled by default, patches apply-or-fail instead of silently continuing, already-applied patches handled idempotently, Kconfig conflicts surfaced, KernelSU setup script requires an explicit URL and SHA-256.
+- Reduced `scripts/enter_headless.sh` to stopping selected Android services and saving which were running. CPU/GPU/thermal/swap/sysctl changes and broad process kills were removed. Restore is best-effort and only starts saved services.
+- Reframed `runtime/setup_micro_glibc.sh` as a staging helper for an existing AArch64 glibc tree; it fails when the loader or libc is missing and refuses to overwrite a populated destination by default.
+- Added maintainable module sources and deterministic ZIP packaging via `scripts/package_module.py`.
+- Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. GitHub Actions remains disabled in repository settings; the workflow is ready for manual enabling.
 
-## Обнаруженные ограничения и риски
+## Tests
 
-1. **UI не подтверждает фактический успех.** В `webroot/index.html` внутри ZIP
-   root и состояния слотов заданы константами; установка Linux и OTA рисуют
-   прогресс через `setInterval`, не вызывая соответствующий backend.
-   Некоторые другие кнопки действительно вызывают `ksu.exec`, но результат
-   не проверяется перед сообщением об успехе. Обычный HTTP-сервер не даёт
-   браузеру KernelSU bridge.
-2. **OTA backend не завершён.** В `op13-updater-engine` ветка `payload.bin`
-   содержит комментарий вместо применения payload. Recovery ZIP исполняется
-   с root без реальной изоляции Slot A, ошибка подавляется через `|| true`.
-   Сообщение «100% intact» не является доказательством сохранности разделов.
-3. **Запись разделов небезопасна.** Backend использует `set -u`, но не
-   останавливается на всех ошибках записи/монтирования; нет полной проверки
-   образов, устройства, размеров, свободного места и согласованности бэкапа.
-   Slot Guardian может автоматически восстановить устаревшие образы.
-   `blockdev --setro` — программный флаг ядра, не аппаратная или постоянная
-   защита: root может снять его, после перезагрузки он не гарантирован.
-4. **Терморегулирование и восстановление.** `enter_headless.sh` включает bypass
-   и останавливает `thermal-engine`, поднимает минимальные CPU-частоты.
-   `restore` не сохраняет и не возвращает все исходные частоты, GPU-параметры,
-   swap, sysctl и состояние thermal-engine. Безопасность температур не доказана.
-5. **Импорт ядра может сообщить успех после ошибки патча.** Fallback только
-   печатает сообщение; Kconfig дописывается без проверки идемпотентности.
-   По умолчанию KernelSU подключается через удалённый `curl | bash`
-   без закрепления commit/hash. Наличие объявленных upstream-веток,
-   применимость патчей и сохранение GKI KMI не подтверждены этим валидатором.
-6. **Micro-glibc — пока каркас каталогов и launcher.** Setup не скачивает
-   и не собирает glibc. Настройка `RESOLV_HOST_CONF` не перенаправляет обычное
-   чтение glibc `/etc/resolv.conf`; смешивание Bionic vendor-библиотек с glibc
-   не обеспечивает ABI-совместимость. README вызывает bash-скрипт через `sh`
-   на Android; поддержка такого запуска не проверена.
-7. **Тесты ограничены.** C-бенчмарк не проверяет ошибки CPU affinity,
-   не сверяет итоговый atomic counter с ожидаемым и не валидирует GEMM
-   по эталону. Его PASS не подтверждает все свойства, заявленные в README.
-   Исходные показатели и прогнозы для SM8750 не имеют приложенных протоколов.
-8. **Root WebUI загружает внешний JavaScript с CDN.** В привилегированном
-   WebView это создаёт дополнительную границу доверия; перед эксплуатацией
-   ресурсы следует поставлять локально и пересмотреть мост исполнения команд.
-9. **Лицензия не задана.** В исходном архиве нет LICENSE. Публикация на GitHub
-   сама по себе не делает код свободно лицензированным. Лицензию должен
-   выбрать правообладатель с учётом прав на включённые компоненты.
+Run:
 
-## GitHub Actions
+```bash
+bash tests/run_tests.sh
+```
 
-Исходный workflow сохранён для изучения, но Actions отключены в настройках
-репозитория перед первым push. Workflow исполняет удалённый installer,
-не собирает полноценное ядро и запускает синтетический валидатор вместо
-проверки патчей на реально клонированном дереве. Включать его стоит после
-исправления этих ограничений, а не ради зелёного значка.
+This includes:
+
+- unit tests for Kconfig conflicts, override behavior, and merge idempotence;
+- patch application against synthetic fixtures only;
+- source-to-ZIP consistency, ZIP CRC/path checks, and shell syntax checks for packaged scripts;
+- static checks that the preview module has no partition-write operations or simulated WebUI controls;
+- C build with `-Wall -Wextra -Werror`, AddressSanitizer and UndefinedBehaviorSanitizer, followed by runtime checks for System V IPC cleanup, clock/syscall calls, actual allowed CPU affinity and exact atomic count, and full GEMM result correctness.
+
+Last run passed: **15 Python tests**, synthetic patch fixtures, module ZIP rebuild/validation, shell syntax checks, and the sanitized C test binary. Environment: Linux x86_64, GCC 16.2, glibc 2.44, 4 allowed CPUs. This validates host-side behavior only. It does not check Android/Bionic, ARM64 performance, kernel compilation, GKI KMI, boot/recovery, OTA safety, temperatures, GPU, NPU, or device-specific partitions.
+
+`python3 tests/verify_kernel_patches.py --kernel-tree PATH` checks textual patch applicability against a real checkout without calling that a successful build. Its default synthetic fixture is deliberately not described as a LineageOS tree.
+
+## Remaining known limitations
+
+1. No OnePlus 13 device, boot image, recovery image, or rootfs has been tested or included.
+2. The kernel patch still changes thermal trip handling. It is skipped by default, has no safety proof, and should not be enabled for device use.
+3. The kernel importer still fetches a mutable LineageOS branch and does not build the kernel. Review/pin the exact upstream commit yourself.
+4. Optional KernelSU setup runs a downloaded script after a user-supplied digest check. That digest only helps if the URL and expected digest were independently reviewed.
+5. The glibc script stages files only; it does not build glibc, validate all ABI dependencies, or make Android vendor/Bionic libraries glibc-compatible.
+6. The C tests run using the host's glibc and kernel. Timing values are not portable and are not device performance claims.
+7. `enter_headless.sh` can stop Android UI services. ADB persistence, service names, and recovery from an interrupted script have not been tested on the target ROM.
+8. No license is specified. Public visibility does not grant reuse rights.

@@ -1,0 +1,57 @@
+#!/system/bin/sh
+# Read-only status stub. Device-writing operations are intentionally disabled
+# until they have been validated on the exact device/build and have recovery tests.
+set -u
+
+cmd_status() {
+    SLOT="$(getprop ro.boot.slot_suffix 2>/dev/null || true)"
+    case "$SLOT" in
+        _a|_b) ;;
+        *) SLOT="unknown" ;;
+    esac
+
+    DEVICE="$(getprop ro.product.device 2>/dev/null || true)"
+    DEVICE_MATCH="false"
+    [ "$DEVICE" = "dodge" ] && DEVICE_MATCH="true"
+
+    ROOTFS_EXISTS="false"
+    ROOTFS_BYTES=0
+    if [ -f /data/media/0/linux/rootfs.img ]; then
+        ROOTFS_EXISTS="true"
+        ROOTFS_BYTES="$(wc -c < /data/media/0/linux/rootfs.img | tr -d '[:space:]')"
+        case "$ROOTFS_BYTES" in
+            ''|*[!0-9]*) ROOTFS_BYTES=0 ;;
+        esac
+    fi
+
+    ROOT_GRANTED="false"
+    [ "$(id -u)" = "0" ] && ROOT_GRANTED="true"
+    cat <<EOF
+{
+  "device_match": ${DEVICE_MATCH},
+  "root_granted": ${ROOT_GRANTED},
+  "active_slot": "${SLOT}",
+  "rootfs_exists": ${ROOTFS_EXISTS},
+  "rootfs_bytes": ${ROOTFS_BYTES},
+  "device_writes_enabled": false
+}
+EOF
+}
+
+disabled() {
+    echo "[!] '$1' is disabled in this preview build. No device writes or slot changes are supported." >&2
+    exit 3
+}
+
+case "${1:-status}" in
+    status)
+        cmd_status
+        ;;
+    install-linux|flash-ota-safe|restore-slot-b|switch-slot)
+        disabled "$1"
+        ;;
+    *)
+        echo "Usage: $0 {status|install-linux|flash-ota-safe|restore-slot-b|switch-slot}" >&2
+        exit 2
+        ;;
+esac
