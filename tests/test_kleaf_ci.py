@@ -57,6 +57,7 @@ class KleafActionsTests(unittest.TestCase):
     def test_build_is_single_job_and_artifact_is_not_flashable(self):
         script = (CI / "run_build.sh").read_text(encoding="utf-8")
         collect = (CI / "collect_artifacts.sh").read_text(encoding="utf-8")
+        config = (CI / "patches/sun-perf-headless.config").read_text(encoding="utf-8")
         self.assertIn("--jobs=1", script)
         self.assertIn("KLEAF_MAKE_JOBS=1", script)
         self.assertIn("apply --unidiff-zero --check", script)
@@ -67,6 +68,8 @@ class KleafActionsTests(unittest.TestCase):
         self.assertIn('link_exact "$DEVICETREE_VENDOR" "$WORKSPACE/kernel/oneplus/sm8750-devicetrees"', script)
         self.assertIn('"$DEVICETREE_VENDOR/BUILD.bazel"', script)
         self.assertIn('"$DEVICETREE_VENDOR/qcom/platform_map.bzl"', script)
+        self.assertIn("CONFIG_OPLUS_QCOM_UFS_DRIVER=y", config)
+        self.assertIn("CONFIG_OPLUS_UFS_DRIVER=m", config)
         self.assertIn("--//msm-kernel:skip_abl=true", script)
         self.assertIn("--//msm-kernel:skip_abi=true", script)
         self.assertNotIn("//msm-kernel:sun_perf_abi", script)
