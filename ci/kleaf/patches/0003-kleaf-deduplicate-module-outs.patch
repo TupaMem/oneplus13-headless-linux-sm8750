@@ -1,0 +1,14 @@
+diff --git a/msm_kernel_le.bzl b/msm_kernel_le.bzl
+--- a/msm_kernel_le.bzl
++++ b/msm_kernel_le.bzl
+@@ -147,0 +148,10 @@ def _define_kernel_build(
++    # Shared GKI modules can also be listed by an LE platform. Keep the first
++    # occurrence: kernel_build emits one filegroup per module output label.
++    unique_modules = []
++    seen_modules = {}
++    for module in in_tree_module_list:
++        if module not in seen_modules:
++            seen_modules[module] = True
++            unique_modules.append(module)
++    in_tree_module_list = unique_modules
++

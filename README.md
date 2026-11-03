@@ -71,6 +71,16 @@ KSU_SETUP_SHA256='<64-hex-digest>' \
 
 Do not enable `ENABLE_THERMAL_BYPASS=1` on a device. No flashing instructions are provided because no boot image or recovery procedure has been validated.
 
+## Pinned Kleaf build on GitHub Actions
+
+Use **Actions → OnePlus 13 sun/perf kernel build → Run workflow** for the
+manual, one-job build from the pinned source lockfile. It produces a raw kernel
+`Image` artifact only; it does not create boot images, include ABL, run ABI
+validation, publish a Release, or touch a phone. The artifact is not flashable.
+See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md) for pins,
+runner limits, and exact scope. The large compile is intentionally excluded
+from push/PR checks and should not be run on a constrained local PC.
+
 ## First device-side step: read-only inventory
 
 After reviewing the script, copy it to a temporary path and run it on the target ROM:

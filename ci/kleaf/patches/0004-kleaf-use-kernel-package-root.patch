@@ -1,0 +1,36 @@
+diff --git a/msm_kernel_la.bzl b/msm_kernel_la.bzl
+--- a/msm_kernel_la.bzl
++++ b/msm_kernel_la.bzl
+@@ -49,4 +49,4 @@
+     gen_config_command = """
+       cat << 'EOF' > "$@"
+-KERNEL_DIR="vendor/qcom/kernel"
++KERNEL_DIR="msm-kernel"
+ VARIANTS=(%s)
+diff --git a/msm_kernel_16k_la.bzl b/msm_kernel_16k_la.bzl
+--- a/msm_kernel_16k_la.bzl
++++ b/msm_kernel_16k_la.bzl
+@@ -47,4 +47,4 @@
+     gen_config_command = """
+       cat << 'EOF' > "$@"
+-KERNEL_DIR="vendor/qcom/kernel"
++KERNEL_DIR="msm-kernel"
+ VARIANTS=(%s)
+diff --git a/msm_kernel_le.bzl b/msm_kernel_le.bzl
+--- a/msm_kernel_le.bzl
++++ b/msm_kernel_le.bzl
+@@ -49,4 +49,4 @@
+     gen_config_command = """
+       cat << 'EOF' > "$@"
+-KERNEL_DIR="vendor/qcom/kernel"
++KERNEL_DIR="msm-kernel"
+ VARIANTS=(%s)
+diff --git a/msm_kernel_vm.bzl b/msm_kernel_vm.bzl
+--- a/msm_kernel_vm.bzl
++++ b/msm_kernel_vm.bzl
+@@ -67,4 +67,4 @@
+     gen_config_command = """
+       cat << 'EOF' > "$@"
+-KERNEL_DIR="vendor/qcom/kernel"
++KERNEL_DIR="msm-kernel"
+ VARIANTS=(%s)

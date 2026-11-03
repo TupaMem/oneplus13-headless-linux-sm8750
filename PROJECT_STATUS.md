@@ -26,7 +26,7 @@ The intended boot design is documented in [`docs/BOOT_FLOW.md`](docs/BOOT_FLOW.m
 - Reframed `runtime/setup_micro_glibc.sh` as a staging helper for an existing AArch64 glibc tree; it fails when the loader or libc is missing and refuses to overwrite a populated destination by default.
 - Added maintainable module sources and deterministic ZIP packaging via `scripts/package_module.py`.
 - Added `docs/BOOT_FLOW.md` and `scripts/android_preflight.sh` as the first implementation phase: capture non-secret device facts before designing the Android unlock/handoff. The preflight has no partition-write or key-reading path.
-- Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. GitHub Actions remains disabled in repository settings; the workflow is ready for manual enabling.
+- Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. Added a separate manual-only, SHA-pinned Kleaf workflow at `.github/workflows/kernel-build.yml`; it builds only the raw `sun/perf` kernel and modules-install targets on a GitHub-hosted runner. It does not create boot images, include ABL, run ABI validation, publish a Release, or access a device. See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md).
 
 ## Tests
 
@@ -44,7 +44,7 @@ This includes:
 - static checks that the preview module has no partition-write operations or simulated WebUI controls;
 - C build with `-Wall -Wextra -Werror`, AddressSanitizer and UndefinedBehaviorSanitizer, followed by runtime checks for System V IPC cleanup, clock/syscall calls, actual allowed CPU affinity and exact atomic count, and full GEMM result correctness.
 
-Last run passed: **16 Python tests**, synthetic patch fixtures, module ZIP rebuild/validation, shell syntax checks, and the sanitized C test binary. Environment: Linux x86_64, GCC 16.2, glibc 2.44, 4 allowed CPUs. This validates host-side behavior only. The Android preflight has not been run on the target phone. No unlock, handoff, OTA blocking, or partition modification is implemented.
+Last host-suite run passed: **20 Python tests**, synthetic patch fixtures, module ZIP rebuild/validation, shell syntax checks, and the sanitized C test binary. Environment: Linux x86_64, GCC 16.2, glibc 2.44, 4 allowed CPUs. The Actions workflow and lockfile also pass `actionlint`, shell syntax, manifest pin checks, and patch applicability checks. These validate host-side behavior only. No successful Kleaf Actions build or target-device preflight has completed. No unlock, handoff, OTA blocking, or partition modification is implemented.
 
 `python3 tests/verify_kernel_patches.py --kernel-tree PATH` checks textual patch applicability against a real checkout without calling that a successful build. Its default synthetic fixture is deliberately not described as a LineageOS tree.
 
@@ -58,3 +58,5 @@ Last run passed: **16 Python tests**, synthetic patch fixtures, module ZIP rebui
 6. The C tests run using the host's glibc and kernel. Timing values are not portable and are not device performance claims.
 7. `enter_headless.sh` can stop Android UI services. ADB persistence, service names, and recovery from an interrupted script have not been tested on the target ROM.
 8. No license is specified. Public visibility does not grant reuse rights.
+9. The first Actions kernel build has not yet completed. A successful host build
+   still does not validate bootability or any device-side feature.

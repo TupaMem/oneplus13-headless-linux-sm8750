@@ -8,7 +8,10 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 python3 -m unittest discover -s "$ROOT/tests" -p 'test_*.py' -v
 python3 "$ROOT/tests/verify_kernel_patches.py" --self-test
 
-for script in "$ROOT/runtime/setup_micro_glibc.sh" "$ROOT/scripts/import_and_patch_lineageos.sh"; do
+for script in \
+    "$ROOT/runtime/setup_micro_glibc.sh" \
+    "$ROOT/scripts/import_and_patch_lineageos.sh" \
+    "$ROOT"/ci/kleaf/*.sh; do
     bash -n "$script"
 done
 sh -n "$ROOT/scripts/enter_headless.sh"

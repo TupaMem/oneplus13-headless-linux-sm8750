@@ -1,0 +1,74 @@
+name: OnePlus 13 sun/perf kernel build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: op13-sun-perf-kernel-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  kernel:
+    name: Pinned Kleaf kernel + modules (host only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/powershell \
+            /usr/local/share/chromium \
+            /usr/share/swift \
+            /usr/local/.ghcup \
+            /opt/az \
+            /usr/local/share/vcpkg
+          df -h "$RUNNER_TEMP"
+          available_kb="$(df -Pk "$RUNNER_TEMP" | awk 'END {print $4}')"
+          if [ "$available_kb" -lt $((30 * 1024 * 1024)) ]; then
+            echo "Less than 30 GiB available on the Actions runner after cleanup." >&2
+            exit 1
+          fi
+
+      - name: Install kernel host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            bc bison flex gcc g++ make libelf-dev libssl-dev libncurses-dev \
+            libcap-dev libxml2-utils rsync unzip zip zstd lz4
+
+      - name: Sync pinned sources and build raw Image
+        run: bash ci/kleaf/run_build.sh
+        env:
+          KERNEL_WORKSPACE: ${{ runner.temp }}/op13-sun-perf-workspace
+          BUILD_LOG: ${{ runner.temp }}/op13-sun-perf-build.log
+          ARTIFACT_DIR: ${{ runner.temp }}/op13-sun-perf-artifacts
+
+      - name: Collect build log and non-flashable artifact
+        id: collect
+        if: always()
+        run: bash ci/kleaf/collect_artifacts.sh
+        env:
+          KERNEL_WORKSPACE: ${{ runner.temp }}/op13-sun-perf-workspace
+          BUILD_LOG: ${{ runner.temp }}/op13-sun-perf-build.log
+          ARTIFACT_DIR: ${{ runner.temp }}/op13-sun-perf-artifacts
+
+      - name: Upload build artifact (not a release)
+        if: always() && steps.collect.outputs.artifact_files == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: op13-sun-perf-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/op13-sun-perf-artifacts/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
