@@ -103,6 +103,13 @@ link_exact() {
 link_exact "$WORKSPACE/sm8750" "$WORKSPACE/msm-kernel"
 link_exact "$WORKSPACE/sm8750-modules" "$WORKSPACE/kernel/oneplus/sm8750-modules"
 link_exact "$WORKSPACE/sm8750-devicetrees" "$WORKSPACE/kernel/oneplus/sm8750-devicetrees"
+DEVICETREE_VENDOR="$WORKSPACE/vendor/qcom/kernel/arch/arm64/boot/dts/vendor"
+mkdir -p "$(dirname "$DEVICETREE_VENDOR")"
+link_exact "$DEVICETREE_VENDOR" "$WORKSPACE/kernel/oneplus/sm8750-devicetrees"
+if [ ! -f "$DEVICETREE_VENDOR/BUILD.bazel" ] || [ ! -f "$DEVICETREE_VENDOR/qcom/platform_map.bzl" ]; then
+    echo "[!] Pinned device-tree package is missing its Kleaf BUILD or qcom platform map." >&2
+    exit 1
+fi
 link_exact "$WORKSPACE/build/msm_kernel_extensions.bzl" "$WORKSPACE/msm-kernel/msm_kernel_extensions.bzl"
 KERNEL_WORKSPACE="$WORKSPACE" bash "$PROJECT_ROOT/ci/kleaf/prepare_oplus_workspace.sh"
 

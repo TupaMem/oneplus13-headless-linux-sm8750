@@ -14,13 +14,16 @@ substantial runner disk space.
 2. Initializes `repo` from the committed `ci/kleaf/manifest.xml` lockfile. The
    manifest pins all 37 source repositories to exact Git revisions; tool and
    OPlus helper revisions are recorded in `ci/kleaf/pins.env`.
-3. Applies only the two Kleaf compatibility patches and the small headless
+3. Links the pinned device-tree checkout into Kleaf's expected
+   `vendor/qcom/kernel/arch/arm64/boot/dts/vendor` workspace path and verifies
+   its `BUILD.bazel` and Qualcomm platform map before Bazel starts.
+4. Applies only the two Kleaf compatibility patches and the small headless
    Kconfig fragment in `ci/kleaf/patches/`. KernelSU and the optional thermal
    bypass are not enabled.
-4. Builds `//msm-kernel:sun_perf` and
+5. Builds `//msm-kernel:sun_perf` and
    `//msm-kernel:sun_perf_modules_install` with one Bazel/Kleaf job. ABI, DTC,
    ABL, boot-image and other image targets are excluded.
-5. Uploads a 14-day Actions artifact containing the raw `Image` (if built),
+6. Uploads a 14-day Actions artifact containing the raw `Image` (if built),
    build log, checksums, source lockfile and build metadata. This is not a
    GitHub Release.
 
