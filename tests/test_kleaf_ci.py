@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import posixpath
 import re
 import subprocess
 import unittest
@@ -68,6 +69,30 @@ class KleafActionsTests(unittest.TestCase):
         self.assertIn('link_exact "$DEVICETREE_VENDOR" "$WORKSPACE/kernel/oneplus/sm8750-devicetrees"', script)
         self.assertIn('"$DEVICETREE_VENDOR/BUILD.bazel"', script)
         self.assertIn('"$DEVICETREE_VENDOR/qcom/platform_map.bzl"', script)
+        self.assertIn('MODULES_PATCH="$PROJECT_ROOT/ci/kleaf/patches/0005-oplus-ufs-sandbox-includes.patch"', script)
+        self.assertIn('git -C "$MODULES_TREE" apply --check "$MODULES_PATCH"', script)
+        ufs_patch = (CI / "patches/0005-oplus-ufs-sandbox-includes.patch").read_text(encoding="utf-8")
+        host_header = "../../../../../../../../../msm-kernel/drivers/ufs/host/ufs-qcom.h"
+        core_header = "../../../../../../../../../msm-kernel/drivers/ufs/core/ufshcd-priv.h"
+        module_source_dir = (
+            "kernel/oneplus/sm8750-modules/oplus/kernel/storage/"
+            "storage_feature_in_module/common/ufs_oplus_dbg"
+        )
+        self.assertIn(f'"{host_header}"', ufs_patch)
+        self.assertIn(f'"{core_header}"', ufs_patch)
+        self.assertEqual(
+            posixpath.normpath(posixpath.join(module_source_dir, host_header)),
+            "msm-kernel/drivers/ufs/host/ufs-qcom.h",
+        )
+        self.assertEqual(
+            posixpath.normpath(posixpath.join(module_source_dir, core_header)),
+            "msm-kernel/drivers/ufs/core/ufshcd-priv.h",
+        )
+        self.assertIn(
+            '"$PROJECT_ROOT/ci/kleaf/patches/0005-oplus-ufs-sandbox-includes.patch" '
+            '"$ARTIFACT_DIR/source-inputs/"',
+            collect,
+        )
         self.assertIn("CONFIG_OPLUS_QCOM_UFS_DRIVER=y", config)
         self.assertIn("CONFIG_OPLUS_UFS_DRIVER=m", config)
         self.assertIn("--//msm-kernel:skip_abl=true", script)

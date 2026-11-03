@@ -20,6 +20,7 @@ cp -- "$PROJECT_ROOT/ci/kleaf/manifest.xml" "$ARTIFACT_DIR/source-inputs/manifes
 cp -- "$PROJECT_ROOT/ci/kleaf/pins.env" "$ARTIFACT_DIR/source-inputs/pins.env"
 cp -- "$PROJECT_ROOT/ci/kleaf/patches/0003-kleaf-deduplicate-module-outs.patch" "$ARTIFACT_DIR/source-inputs/"
 cp -- "$PROJECT_ROOT/ci/kleaf/patches/0004-kleaf-use-kernel-package-root.patch" "$ARTIFACT_DIR/source-inputs/"
+cp -- "$PROJECT_ROOT/ci/kleaf/patches/0005-oplus-ufs-sandbox-includes.patch" "$ARTIFACT_DIR/source-inputs/"
 cp -- "$PROJECT_ROOT/ci/kleaf/patches/sun-perf-headless.config" "$ARTIFACT_DIR/source-inputs/"
 
 BUILD_RESULT="Image unavailable; inspect logs/build.log"

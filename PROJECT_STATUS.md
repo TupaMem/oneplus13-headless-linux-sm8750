@@ -58,10 +58,11 @@ Last host-suite run passed: **20 Python tests**, synthetic patch fixtures, modul
 6. The C tests run using the host's glibc and kernel. Timing values are not portable and are not device performance claims.
 7. `enter_headless.sh` can stop Android UI services. ADB persistence, service names, and recovery from an interrupted script have not been tested on the target ROM.
 8. No license is specified. Public visibility does not grant reuse rights.
-9. Actions run `41604285375` first exposed a missing device-tree workspace
-   link; commit `ced1409` fixed it. Run `41609054119` reached kernel compilation
-   but failed on duplicate `ufs_ioctl_query_data` declarations because the
-   selected `sun_perf` config omitted the pinned OnePlus UFS settings. The
-   Kleaf fragment now matches those settings; another Actions run is required.
-   A successful host build still does not validate bootability or device-side
-   features.
+9. Actions run `41604285375` exposed a missing device-tree workspace link;
+   commit `ced1409` fixed it. Run `41609054119` reached compilation but found
+   duplicate UFS query structs; commit `eca0dd4` enabled the pinned OnePlus UFS
+   settings. Run `41619891068` then failed because the OPlus debug module's
+   relative include escaped Bazel's sandbox. The Kleaf path patch now points
+   those includes at the in-tree UFS headers. The `.113` attempt ended before
+   source sync completed; no `Image` was produced. A successful host build
+   still does not validate bootability or device-side features.

@@ -1,0 +1,19 @@
+diff --git a/oplus/kernel/storage/storage_feature_in_module/common/ufs_oplus_dbg/ufs-oplus-dbg.c b/oplus/kernel/storage/storage_feature_in_module/common/ufs_oplus_dbg/ufs-oplus-dbg.c
+--- a/oplus/kernel/storage/storage_feature_in_module/common/ufs_oplus_dbg/ufs-oplus-dbg.c
++++ b/oplus/kernel/storage/storage_feature_in_module/common/ufs_oplus_dbg/ufs-oplus-dbg.c
+@@ -14,12 +14,12 @@
+ #include <soc/oplus/device_info.h>
+ 
+ #include "ufs-oplus-dbg.h"
+ #ifdef CONFIG_OPLUS_QCOM_UFS_DRIVER
+-#include "../../../../../../../sm8750/drivers/ufs/host/ufs-qcom.h"
++#include "../../../../../../../../../msm-kernel/drivers/ufs/host/ufs-qcom.h"
+ #endif /* CONFIG_OPLUS_QCOM_UFS_DRIVER */
+ 
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+ #ifdef CONFIG_OPLUS_QCOM_UFS_DRIVER
+-#include "../../../../../../../sm8750/drivers/ufs/core/ufshcd-priv.h"
++#include "../../../../../../../../../msm-kernel/drivers/ufs/core/ufshcd-priv.h"
+ #endif /* CONFIG_OPLUS_QCOM_UFS_DRIVER */
+ #include "ufshcd-priv.h"
+ #else

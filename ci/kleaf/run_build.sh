@@ -119,6 +119,11 @@ for patch in \
     git -C "$WORKSPACE/msm-kernel" apply --unidiff-zero --check "$patch"
     git -C "$WORKSPACE/msm-kernel" apply --unidiff-zero "$patch"
 done
+MODULES_PATCH="$PROJECT_ROOT/ci/kleaf/patches/0005-oplus-ufs-sandbox-includes.patch"
+MODULES_TREE="$WORKSPACE/kernel/oneplus/sm8750-modules"
+git -C "$MODULES_TREE" apply --check "$MODULES_PATCH"
+git -C "$MODULES_TREE" apply "$MODULES_PATCH"
+git -C "$MODULES_TREE" diff --check
 python3 "$PROJECT_ROOT/scripts/merge_kconfig.py" \
     "$WORKSPACE/msm-kernel/arch/arm64/configs/gki_defconfig" \
     "$PROJECT_ROOT/ci/kleaf/patches/sun-perf-headless.config"
