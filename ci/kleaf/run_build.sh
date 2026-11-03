@@ -59,7 +59,7 @@ cd "$WORKSPACE"
 python3 "$REPO_TOOL_DIR/repo" init \
     --manifest-url="file://$MANIFEST_REPO" \
     --manifest-branch=locked \
-    --repo-url="file://$REPO_TOOL_DIR" \
+    --repo-url="$MANIFEST_URL" \
     --repo-rev="$REPO_TOOL_COMMIT"
 python3 "$REPO_TOOL_DIR/repo" sync --jobs=4 --no-clone-bundle
 

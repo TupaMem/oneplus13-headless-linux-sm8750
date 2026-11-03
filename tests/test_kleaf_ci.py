@@ -60,6 +60,7 @@ class KleafActionsTests(unittest.TestCase):
         self.assertIn("--jobs=1", script)
         self.assertIn("KLEAF_MAKE_JOBS=1", script)
         self.assertIn("apply --unidiff-zero --check", script)
+        self.assertIn('--repo-rev="$REPO_TOOL_COMMIT"', script)
         self.assertIn("//msm-kernel:sun_perf", script)
         self.assertIn("//msm-kernel:sun_perf_modules_install", script)
         self.assertIn("--//msm-kernel:skip_abl=true", script)

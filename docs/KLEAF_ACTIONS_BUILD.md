@@ -36,6 +36,9 @@ FBE/KeyMint compatibility, recovery safety, graphics support, or OTA behavior.
   modules and device trees.
 - `pins.env` records the pinned repo client, upstream manifest provenance and
   OnePlus helper revision.
+- The repo client launcher checksum and source commit are verified before
+  initialization; `repo init` fetches that exact commit from the official
+  Gerrit remote.
 - The compatibility patches are kept separate from the upstream kernel tree;
   the workflow checks they apply cleanly before using them. The module-list
   insertion uses a zero-context hunk, so the exact pinned kernel SHA is checked
