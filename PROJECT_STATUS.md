@@ -16,7 +16,13 @@ The module has been reworked into a **read-only preview** and rebuilt from `modu
 
 The preview module is not an installer and must not be used as a device protection mechanism. Re-enabling device operations requires device-specific implementation, recovery procedures, and hardware testing.
 
-The intended boot design is documented in [`docs/BOOT_FLOW.md`](docs/BOOT_FLOW.md): A remains Android, B will eventually boot a LineageOS-derived kernel, Android performs its normal credential unlock, then glibc Linux takes over. This is a proposed flow only. Android unlock integration, lock-screen UI, Linux handoff, Wayland, and OTA suppression are not implemented.
+The selected userspace direction is Arch Linux ARM for AArch64; see
+[`docs/LINUX_SYSTEM_PLAN.md`](docs/LINUX_SYSTEM_PLAN.md). This means a
+device-specific rootfs/port based on Arch, not a new distro from scratch. The
+proposed Android-A/Linux-B boot/handoff concept is documented in
+[`docs/BOOT_FLOW.md`](docs/BOOT_FLOW.md), but physical slot mapping, Android
+unlock integration, Linux handoff, Wayland, and OTA suppression are not
+validated or implemented.
 
 ## Changes in the hardening pass
 
@@ -26,6 +32,7 @@ The intended boot design is documented in [`docs/BOOT_FLOW.md`](docs/BOOT_FLOW.m
 - Reframed `runtime/setup_micro_glibc.sh` as a staging helper for an existing AArch64 glibc tree; it fails when the loader or libc is missing and refuses to overwrite a populated destination by default.
 - Added maintainable module sources and deterministic ZIP packaging via `scripts/package_module.py`.
 - Added `docs/BOOT_FLOW.md` and `scripts/android_preflight.sh` as the first implementation phase: capture non-secret device facts before designing the Android unlock/handoff. The preflight has no partition-write or key-reading path.
+- Recorded Arch Linux ARM as the AArch64 userspace direction and added a staged end-user roadmap. No Arch rootfs or device port exists yet.
 - Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. Added a separate manual-only, SHA-pinned Kleaf workflow at `.github/workflows/kernel-build.yml`; it attempts a pinned `sun/perf` Kleaf build on a GitHub-hosted runner. It does not create boot images, include ABL, run ABI validation, publish a Release, or access a device. See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md).
 
 ## Tests
@@ -70,7 +77,8 @@ Last host-suite run passed: **20 Python tests**, synthetic patch fixtures, modul
    KMI and `USER_NS`, but run `41781537334` failed: mixed-tree Kbuild has no
    `vmlinux` rule for that target (`No rule to make target 'vmlinux', needed by
    'Image'`). The common GKI base target built as a dependency, but its Image was
-   not collected. The artifact model now needs an explicit choice: use the
-   common GKI Image, or design a non-mixed device-kernel build. The `.113`
-   attempt ended before source sync completed. No host build validates
-   bootability or device-side features.
+    not collected. The user selected the common GKI Image as the next artifact
+    direction; CI has not yet been changed to collect it. Arch Linux ARM is the
+    selected userspace base, but no rootfs or device port exists. The `.113`
+    attempt ended before source sync completed. No host build validates
+    bootability or device-side features.

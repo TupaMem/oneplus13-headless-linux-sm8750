@@ -1,19 +1,27 @@
-# Proposed boot flow: Android in A, glibc Linux in B
+# Proposed boot/handoff flow: Android in A, Arch Linux ARM in B
 
-**Status: design recorded; hardware implementation not started.** No key material,
-partition table, boot image, or system image is modified by this design document
-or the preflight script.
+**Status: conceptual design only; hardware implementation not started.** Arch
+Linux ARM is the selected userspace direction. The A/B labels and the proposed
+Android-to-Linux handoff do not establish that the target's physical slots map
+this way or that the flow is feasible. No key material, partition table, boot
+image, or system image is modified by this design document or the preflight
+script.
 
-## Accepted target
+## Intended invariants (not implemented)
 
-- Slot A remains the normal Android ROM.
-- Slot B boots a LineageOS-derived kernel and eventually a glibc Linux rootfs.
+- A remains the intended normal Android environment; B is the intended Linux
+  environment. The actual slot/partition mapping is unconfirmed.
+- Linux userspace is planned to use Arch Linux ARM for AArch64. The kernel path
+  is planned around the pinned common GKI Image and matching OnePlus vendor
+  components; that combination has not been built or validated.
 - Android `/data` encryption remains enabled. No raw key or PIN is stored in the
   module, boot image, logs, or command line.
-- Android automatic OTA is blocked while B is Linux. Any Android maintenance is
-  a separate, manually reviewed procedure that must preserve B.
-- The Android lock screen is the intended credential UI. SDDM starts only after
-  Android has unlocked `/data` and Linux has mounted its rootfs.
+- Android OTA must be blocked while B is Linux. Any Android maintenance is a
+  separate, manually reviewed procedure that must preserve B.
+- Reusing Android's lock screen and credential services is an unvalidated
+  design hypothesis, not an implemented login flow. No PIN may be captured.
+- A Linux graphical login such as SDDM is not part of the initial headless
+  bring-up and must not be promised before graphics support is proven.
 
 ## Proposed sequence
 
@@ -23,8 +31,8 @@ Boot ROM / ABL selects B
   → matching Android early-boot components initialize storage and KeyMint
   → Android lock screen requests the user's credential locally
   → Android's vold / credential / KeyMint flow unlocks the required /data keys
-  → a privileged, audited handoff mounts the Linux rootfs and starts glibc
-  → Linux graphical session (Wayland); optionally SDDM for Linux login
+  → a privileged, audited handoff mounts the Arch Linux ARM rootfs
+  → optional Linux graphical session only after the hardware gate passes
 ```
 
 The kernel does not decrypt Android user data by itself. The credential must go
@@ -58,7 +66,8 @@ module.
 
 ## Wayland is a separate gate
 
-Reaching glibc does not establish graphics support. Before promising a desktop,
+Reaching an Arch/glibc shell does not establish graphics support. Before
+promising a desktop,
 verify the actual kernel exposes a usable display connector and DRM/KMS device,
 input/touch devices, and a compatible Mesa/GBM path for the GPU. A KGSL node or
 vendor OpenCL/Vulkan library alone does not prove a Wayland compositor can

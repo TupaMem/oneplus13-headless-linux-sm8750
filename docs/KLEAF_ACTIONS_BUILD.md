@@ -24,7 +24,8 @@ substantial runner disk space.
    vendor module outputs. This is not a working path: `sun_perf` uses Kleaf's
    mixed-tree mode with `//common:kernel_aarch64` as `base_kernel`; Kbuild
    intentionally omits the `vmlinux` target in mixed-tree mode, so `Image`
-   fails. No successful Image-only workflow target is selected yet.
+   fails. The user selected the common GKI base Image as the next artifact
+   direction; the workflow does not collect it yet.
 6. Uploads a 14-day Actions artifact containing the raw `Image` (if built),
    build log, checksums, source lockfile and build metadata. This is not a
    GitHub Release.
@@ -62,10 +63,10 @@ unresolved symbols: the pinned GKI KMI does not export
 run `41781537334` confirmed that `make_goals=["Image"]` cannot be used on the
 mixed-tree `//msm-kernel:sun_perf` target: Kbuild reports `No rule to make
 target 'vmlinux', needed by 'Image'`. Its `//common:kernel_aarch64` dependency
-build completed, but its GKI Image was not collected. Before another expensive
-run, choose whether to package that common GKI Image (the base image paired with
-vendor modules) or design a separate non-mixed `sun_perf` image build. Neither
-path would validate bootability or device-side behavior.
+build completed, but its GKI Image was not collected. The selected next step is
+to update the workflow to package that common GKI Image, clearly identified as
+the base image paired with vendor modules. This does not build or validate the
+Arch Linux ARM rootfs, matching vendor modules, bootability, or device behavior.
 
 ## Local validation without compiling the kernel
 
