@@ -21,6 +21,7 @@ cp -- "$PROJECT_ROOT/ci/kleaf/pins.env" "$ARTIFACT_DIR/source-inputs/pins.env"
 cp -- "$PROJECT_ROOT/ci/kleaf/patches/0003-kleaf-deduplicate-module-outs.patch" "$ARTIFACT_DIR/source-inputs/"
 cp -- "$PROJECT_ROOT/ci/kleaf/patches/0004-kleaf-use-kernel-package-root.patch" "$ARTIFACT_DIR/source-inputs/"
 cp -- "$PROJECT_ROOT/ci/kleaf/patches/0005-oplus-ufs-sandbox-includes.patch" "$ARTIFACT_DIR/source-inputs/"
+cp -- "$PROJECT_ROOT/ci/kleaf/patches/0007-kleaf-sun-perf-image-only.patch" "$ARTIFACT_DIR/source-inputs/"
 cp -- "$PROJECT_ROOT/ci/kleaf/patches/sun-perf-headless.config" "$ARTIFACT_DIR/source-inputs/"
 
 BUILD_RESULT="Image unavailable; inspect logs/build.log"
@@ -39,9 +40,11 @@ kernel_build_commit=${KERNEL_BUILD_COMMIT}
 oplus_kleaf_commit=${OPLUS_KLEAF_COMMIT}
 repo_tool_commit=${REPO_TOOL_COMMIT}
 upstream_kernel_manifest_commit=${UPSTREAM_KERNEL_MANIFEST_COMMIT}
-build_targets=//msm-kernel:sun_perf,//msm-kernel:sun_perf_modules_install
+build_targets=//msm-kernel:sun_perf
 bazel_jobs=1
 kleaf_make_jobs=1
+sun_perf_modules_built=no
+modules_install_built=no
 boot_image_generated=no
 abl_included=no
 device_tested=no
@@ -52,7 +55,8 @@ EOF
 cat > "$ARTIFACT_DIR/README.txt" <<'EOF'
 GitHub Actions host-build artifact. Image, when present, is a raw ARM64 Linux
 kernel Image. It is NOT boot.img, vendor_boot.img, or init_boot.img and is not
-flashable as packaged. No bootloader/ABL target or target-device test was run.
+flashable as packaged. Sun/perf modules and modules_install were not built. No
+bootloader/ABL target or target-device test was run.
 Verify SHA256SUMS before using or moving any file. This does not establish
 bootability, FBE/KeyMint compatibility, recovery safety, graphics support, or
 OTA behavior.

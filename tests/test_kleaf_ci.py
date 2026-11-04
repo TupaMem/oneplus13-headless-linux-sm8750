@@ -64,7 +64,26 @@ class KleafActionsTests(unittest.TestCase):
         self.assertIn("apply --unidiff-zero --check", script)
         self.assertIn('--repo-rev="$REPO_TOOL_COMMIT"', script)
         self.assertIn("//msm-kernel:sun_perf", script)
-        self.assertIn("//msm-kernel:sun_perf_modules_install", script)
+        self.assertNotIn("//msm-kernel:sun_perf_modules_install", script)
+        image_only_patch_path = (
+            '"$PROJECT_ROOT/ci/kleaf/patches/0007-kleaf-sun-perf-image-only.patch"'
+        )
+        self.assertIn(image_only_patch_path, script)
+        self.assertIn(
+            '"$PROJECT_ROOT/ci/kleaf/patches/0007-kleaf-sun-perf-image-only.patch" '
+            '"$ARTIFACT_DIR/source-inputs/"',
+            collect,
+        )
+        self.assertNotIn("sun_perf_modules_install", collect)
+        self.assertIn("sun_perf_modules_built=no", collect)
+        self.assertIn("modules_install_built=no", collect)
+        image_only_patch = (CI / "patches/0007-kleaf-sun-perf-image-only.patch").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('target == "sun_perf"', image_only_patch)
+        self.assertIn('module_outs = [] if image_only else in_tree_module_list', image_only_patch)
+        self.assertIn('make_goals = ["Image"] if image_only else None', image_only_patch)
+        self.assertIn('arch/arm64/boot/Image', image_only_patch)
         self.assertIn('DEVICETREE_VENDOR="$WORKSPACE/vendor/qcom/kernel/arch/arm64/boot/dts/vendor"', script)
         self.assertIn('link_exact "$DEVICETREE_VENDOR" "$WORKSPACE/kernel/oneplus/sm8750-devicetrees"', script)
         self.assertIn('"$DEVICETREE_VENDOR/BUILD.bazel"', script)
@@ -95,6 +114,7 @@ class KleafActionsTests(unittest.TestCase):
         )
         self.assertIn("CONFIG_OPLUS_QCOM_UFS_DRIVER=y", config)
         self.assertIn("CONFIG_OPLUS_UFS_DRIVER=m", config)
+        self.assertIn("CONFIG_USER_NS=y", config)
         self.assertIn("--//msm-kernel:skip_abl=true", script)
         self.assertIn("--//msm-kernel:skip_abi=true", script)
         self.assertNotIn("//msm-kernel:sun_perf_abi", script)

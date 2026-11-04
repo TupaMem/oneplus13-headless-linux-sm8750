@@ -59,10 +59,15 @@ Last host-suite run passed: **20 Python tests**, synthetic patch fixtures, modul
 7. `enter_headless.sh` can stop Android UI services. ADB persistence, service names, and recovery from an interrupted script have not been tested on the target ROM.
 8. No license is specified. Public visibility does not grant reuse rights.
 9. Actions run `41604285375` exposed a missing device-tree workspace link;
-   commit `ced1409` fixed it. Run `41609054119` reached compilation but found
-   duplicate UFS query structs; commit `eca0dd4` enabled the pinned OnePlus UFS
-   settings. Run `41619891068` then failed because the OPlus debug module's
-   relative include escaped Bazel's sandbox. The Kleaf path patch now points
-   those includes at the in-tree UFS headers. The `.113` attempt ended before
-   source sync completed; no `Image` was produced. A successful host build
-   still does not validate bootability or device-side features.
+   commit `ced1409` fixed it. Run `41609054119` found duplicate UFS query
+   structs; `eca0dd4` enabled the pinned OnePlus UFS settings. Run
+   `41619891068` then found sandbox-escaping UFS includes; commit `6f01414`
+   corrected them. Run `41669250057` passed source sync and compilation but
+   failed at modpost, so no `Image` was produced. Its log reported missing
+   OPlus device-info/bootmode and QTI charger symbols, plus `make_kuid` and
+   `from_kuid_munged` absent from the pinned KMI with `CONFIG_USER_NS=y`.
+   The approved direction is Image-only Kleaf, preserving KMI and `USER_NS`.
+   An uncommitted candidate requests only `Image` and omits the sun/perf module
+   outputs; it still needs a real pinned build. The `.113` attempt ended before
+   source sync completed. None of these host builds validates bootability or
+   device-side features.

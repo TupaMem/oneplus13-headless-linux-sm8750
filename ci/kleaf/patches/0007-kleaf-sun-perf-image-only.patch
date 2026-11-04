@@ -1,0 +1,30 @@
+diff --git a/msm_kernel_la.bzl b/msm_kernel_la.bzl
+--- a/msm_kernel_la.bzl
++++ b/msm_kernel_la.bzl
+@@ -157,7 +157,11 @@
+     """
++    image_only = target == "sun_perf"
+     out_list = [".config", "Module.symvers"]
+-    if dtb_list:
+-        out_list += dtb_list
+-    if dtbo_list:
+-        out_list += dtbo_list
++    if image_only:
++        out_list += ["arch/arm64/boot/Image"]
++    else:
++        if dtb_list:
++            out_list += dtb_list
++        if dtbo_list:
++            out_list += dtbo_list
+ 
+@@ -164,8 +168,9 @@
+     kernel_build(
+         name = target,
+-        module_outs = in_tree_module_list,
++        module_outs = [] if image_only else in_tree_module_list,
++        make_goals = ["Image"] if image_only else None,
+         outs = out_list,
+         build_config = ":{}_build_config".format(target),
+         dtstree = dtstree,
+         page_size = "4k",
+         base_kernel = base_kernel,

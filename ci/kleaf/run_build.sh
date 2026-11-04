@@ -115,7 +115,8 @@ KERNEL_WORKSPACE="$WORKSPACE" bash "$PROJECT_ROOT/ci/kleaf/prepare_oplus_workspa
 
 for patch in \
     "$PROJECT_ROOT/ci/kleaf/patches/0003-kleaf-deduplicate-module-outs.patch" \
-    "$PROJECT_ROOT/ci/kleaf/patches/0004-kleaf-use-kernel-package-root.patch"; do
+    "$PROJECT_ROOT/ci/kleaf/patches/0004-kleaf-use-kernel-package-root.patch" \
+    "$PROJECT_ROOT/ci/kleaf/patches/0007-kleaf-sun-perf-image-only.patch"; do
     git -C "$WORKSPACE/msm-kernel" apply --unidiff-zero --check "$patch"
     git -C "$WORKSPACE/msm-kernel" apply --unidiff-zero "$patch"
 done
@@ -147,8 +148,7 @@ cd "$WORKSPACE"
     --ignore_missing_projects \
     --incompatible_sandbox_hermetic_tmp=false \
     --nozstd_dwarf_compression \
-    //msm-kernel:sun_perf \
-    //msm-kernel:sun_perf_modules_install
+    //msm-kernel:sun_perf
 
 IMAGE="$WORKSPACE/bazel-bin/msm-kernel/sun_perf/arch/arm64/boot/Image"
 if [ ! -s "$IMAGE" ]; then

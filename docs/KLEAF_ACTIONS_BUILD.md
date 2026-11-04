@@ -18,13 +18,14 @@ substantial runner disk space.
    `vendor/qcom/kernel/arch/arm64/boot/dts/vendor` workspace path and verifies
    its `BUILD.bazel` and Qualcomm platform map before Bazel starts.
 4. Applies the Kleaf compatibility patches and the small headless Kconfig
-   fragment in `ci/kleaf/patches/`. A pinned-module patch keeps the OPlus UFS
-   private-header includes inside the kernel tree so Bazel's sandbox can see
-   them. The fragment enables the pinned OnePlus UFS driver/debug-module
-   settings. KernelSU and the optional thermal bypass are not enabled.
-5. Builds `//msm-kernel:sun_perf` and
-   `//msm-kernel:sun_perf_modules_install` with one Bazel/Kleaf job. ABI, DTC,
-   ABL, boot-image and other image targets are excluded.
+   fragment in `ci/kleaf/patches/`. The image-only target skips vendor module
+   compilation; the pinned UFS include patch is retained in the source inputs
+   for provenance. The fragment keeps the OnePlus UFS profile settings.
+   KernelSU and the optional thermal bypass are not enabled.
+5. Builds only `//msm-kernel:sun_perf` with one Bazel/Kleaf job. The pinned
+   source patch requests `Image` and omits the sun/perf module outputs, avoiding
+   vendor-module `modpost`; ABI, DTC, ABL, boot-image and modules-install targets
+   are excluded. Kleaf may still build its required common base-kernel dependency.
 6. Uploads a 14-day Actions artifact containing the raw `Image` (if built),
    build log, checksums, source lockfile and build metadata. This is not a
    GitHub Release.
@@ -53,6 +54,17 @@ FBE/KeyMint compatibility, recovery safety, graphics support, or OTA behavior.
   hours. GitHub-hosted runner limits or source-host throttling can stop it; in
   that case the artifact/log records the failure, and no local fallback build
   should be started automatically.
+
+## Current status
+
+Actions run `41669250057` reached module `modpost` but failed with unresolved
+symbols; no `Image` was produced. The pinned GKI KMI does not export
+`make_kuid`/`from_kuid_munged` while this profile enables `USER_NS`. The
+approved follow-up is a Kleaf target that builds only the raw `Image`,
+preserving both the current KMI boundary and `USER_NS`. An uncommitted candidate
+sets `make_goals=["Image"]` and clears the sun/perf module outputs; it has not
+yet passed a pinned Actions build. A successful image build would still not
+validate bootability or device-side behavior.
 
 ## Local validation without compiling the kernel
 
