@@ -16,8 +16,9 @@ repository today.
 - **Kernel:** use the pinned common GKI base `Image` as the kernel artifact,
   paired with compatible OnePlus `sun/perf` vendor components when those are
   built and validated. The GKI image is the common base, not an Image with the
-  vendor profile compiled into it. The user selected this artifact direction;
-  CI has not yet been changed to collect it.
+  vendor profile compiled into it. The selected CI candidate enables
+  `CONFIG_USER_NS=y` and gates on the pinned common GKI ABI baseline; that path
+  has not passed a new Actions run.
 - **Bring-up target:** start with a minimal, headless AArch64 rootfs. A desktop
   is a later milestone, gated on display, GPU, input, and power support.
 - **Distribution work:** keep the base package manager and repositories from
@@ -56,11 +57,13 @@ authorize writes.
 
 ### 1. Produce and identify the kernel component
 
-Fix the Actions workflow to collect the pinned `//common:kernel_aarch64` raw
-`Image`, then verify its SHA-256 and provenance. The current workflow instead
-asks the mixed-tree `//msm-kernel:sun_perf` target for `Image`; run `41781537334`
-fails because that target has no `vmlinux` rule in mixed-tree mode. The selected
-GKI Image path is not implemented yet. Separately determine the exact vendor
+Run the updated Actions workflow to apply the USER_NS fragment, pass the pinned
+common ABI gate, and collect the `//common:kernel_aarch64` raw `Image`; then
+verify its SHA-256 and provenance.
+The previous workflow asked the mixed-tree `//msm-kernel:sun_perf` target for
+`Image`; run `41781537334` failed because that target has no `vmlinux` rule in
+mixed-tree mode. The common-GKI target change has not passed a new build yet.
+Separately determine the exact vendor
 modules, DTB/DTBO, firmware, and version/KMI matching needed for a usable device
 port. A raw Image alone is not a bootable Linux system.
 
@@ -108,7 +111,9 @@ graphics support is independently proven.
 ## Current blockers
 
 - No exact device SKU, partition map, boot-chain facts, or target-device test.
-- No successful Kleaf Image artifact; the current mixed-tree Image target fails.
+- No successful collected GKI Image artifact; the new USER_NS/common-ABI-gated
+  workflow has not yet been run. The previous mixed-tree `sun_perf` Image
+  attempt failed.
 - No validated matching `sun/perf` modules or OnePlus 13 Linux hardware port.
 - No Arch rootfs recipe, package pin set, boot integration, installer, OTA guard,
   or recovery procedure.

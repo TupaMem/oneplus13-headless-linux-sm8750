@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
-# Reproducible, single-job host build. Produces only a raw kernel Image.
+# Reproducible, single-job host build. ABI-gates and packages the common GKI base Image.
 set -Eeuo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$PROJECT_ROOT/ci/kleaf/pins.env"
 WORKSPACE="${KERNEL_WORKSPACE:?Set KERNEL_WORKSPACE to a fresh workspace path}"
 RUNNER_TEMP="${RUNNER_TEMP:?RUNNER_TEMP must be set by the CI runner}"
-BUILD_LOG="${BUILD_LOG:-$RUNNER_TEMP/op13-sun-perf-build.log}"
-ARTIFACT_DIR="${ARTIFACT_DIR:-$RUNNER_TEMP/op13-sun-perf-artifacts}"
+BUILD_LOG="${BUILD_LOG:-$RUNNER_TEMP/op13-gki-base-image-build.log}"
+ARTIFACT_DIR="${ARTIFACT_DIR:-$RUNNER_TEMP/op13-gki-base-image-artifacts}"
+ABI_GATE_STATUS="${ABI_GATE_STATUS:-$RUNNER_TEMP/op13-gki-abi-gate-passed}"
+IMAGE_BUILD_STATUS="${IMAGE_BUILD_STATUS:-$RUNNER_TEMP/op13-gki-image-build-passed}"
+USERNS_OVERLAY_STATUS="${USERNS_OVERLAY_STATUS:-$RUNNER_TEMP/op13-gki-userns-overlay-applied}"
 REPO_TOOL_DIR="$RUNNER_TEMP/git-repo-$REPO_TOOL_COMMIT"
 MANIFEST_REPO="$RUNNER_TEMP/op13-kernel-manifest"
 MANIFEST_URL="https://gerrit.googlesource.com/git-repo"
+
+rm -f -- "$ABI_GATE_STATUS" "$IMAGE_BUILD_STATUS" "$USERNS_OVERLAY_STATUS"
 
 case "$WORKSPACE" in
     "$PROJECT_ROOT"|"$PROJECT_ROOT"/*)
@@ -29,9 +34,12 @@ fi
 mkdir -p "$WORKSPACE" "$(dirname "$BUILD_LOG")" "$ARTIFACT_DIR"
 exec > >(tee -a "$BUILD_LOG") 2>&1
 
-echo "[*] Building pinned OnePlus 13 sun/perf kernel on the Actions runner."
-echo "[*] No boot image, ABL, DTC, ABI target, device access, or flash step."
-echo "[*] Kernel revision: $KERNEL_COMMIT"
+echo "[*] Building the pinned common GKI base Image for the OnePlus 13 project."
+echo "[*] This is not a sun/perf-configured Image; no vendor module target is requested."
+echo "[*] CONFIG_USER_NS=y is applied via a pinned project fragment and ABI-gated against the pinned GKI baseline."
+echo "[*] GKI target make goals also build common GKI modules; they are not packaged."
+echo "[*] No boot image, ABL, device access, or flash step."
+echo "[*] Common kernel revision: $KERNEL_COMMON_COMMIT"
 echo "[*] Single-job build; KLEAF_MAKE_JOBS=1."
 
 # Use a pinned repo client. The manifest itself is a committed local lockfile,
@@ -77,6 +85,22 @@ assert_revision "$WORKSPACE/kernel/oneplus/sm8750-devicetrees" "$DEVICE_TREE_COM
 assert_revision "$WORKSPACE/common" "$KERNEL_COMMON_COMMIT"
 assert_revision "$WORKSPACE/build/kernel" "$KERNEL_BUILD_COMMIT"
 
+USERNS_PATCH="$PROJECT_ROOT/ci/kleaf/patches/0008-op13-gki-userns-config.patch"
+USERNS_FRAGMENT="$PROJECT_ROOT/ci/kleaf/patches/op13-userns.fragment"
+if [ ! -s "$USERNS_FRAGMENT" ]; then
+    echo "[!] CONFIG_USER_NS fragment is missing or empty." >&2
+    exit 1
+fi
+git -C "$WORKSPACE/common" apply --check "$USERNS_PATCH"
+cp -- "$USERNS_FRAGMENT" "$WORKSPACE/common/arch/arm64/configs/op13_userns.fragment"
+git -C "$WORKSPACE/common" apply "$USERNS_PATCH"
+git -C "$WORKSPACE/common" diff --check
+if ! grep -Fq '"defconfig_fragments": ["arch/arm64/configs/op13_userns.fragment"]' "$WORKSPACE/common/BUILD.bazel"; then
+    echo "[!] The pinned common BUILD target does not reference the USER_NS fragment." >&2
+    exit 1
+fi
+: > "$USERNS_OVERLAY_STATUS"
+
 free_kb="$(df -Pk "$WORKSPACE" | awk 'END {print $4}')"
 if [ "$free_kb" -lt $((20 * 1024 * 1024)) ]; then
     echo "[!] Less than 20 GiB remains after source sync; refusing to start Kleaf." >&2
@@ -85,75 +109,35 @@ if [ "$free_kb" -lt $((20 * 1024 * 1024)) ]; then
 fi
 df -h "$WORKSPACE"
 
-link_exact() {
-    local link="$1" target="$2"
-    if [ -L "$link" ]; then
-        if [ "$(readlink -f "$link")" != "$(readlink -f "$target")" ]; then
-            echo "[!] Existing symlink points elsewhere: $link" >&2
-            exit 1
-        fi
-    elif [ -e "$link" ]; then
-        echo "[!] Refusing to replace existing path: $link" >&2
-        exit 1
-    else
-        ln -s "$target" "$link"
-    fi
-}
-
-link_exact "$WORKSPACE/sm8750" "$WORKSPACE/msm-kernel"
-link_exact "$WORKSPACE/sm8750-modules" "$WORKSPACE/kernel/oneplus/sm8750-modules"
-link_exact "$WORKSPACE/sm8750-devicetrees" "$WORKSPACE/kernel/oneplus/sm8750-devicetrees"
-DEVICETREE_VENDOR="$WORKSPACE/vendor/qcom/kernel/arch/arm64/boot/dts/vendor"
-mkdir -p "$(dirname "$DEVICETREE_VENDOR")"
-link_exact "$DEVICETREE_VENDOR" "$WORKSPACE/kernel/oneplus/sm8750-devicetrees"
-if [ ! -f "$DEVICETREE_VENDOR/BUILD.bazel" ] || [ ! -f "$DEVICETREE_VENDOR/qcom/platform_map.bzl" ]; then
-    echo "[!] Pinned device-tree package is missing its Kleaf BUILD or qcom platform map." >&2
-    exit 1
-fi
-link_exact "$WORKSPACE/build/msm_kernel_extensions.bzl" "$WORKSPACE/msm-kernel/msm_kernel_extensions.bzl"
-KERNEL_WORKSPACE="$WORKSPACE" bash "$PROJECT_ROOT/ci/kleaf/prepare_oplus_workspace.sh"
-
-for patch in \
-    "$PROJECT_ROOT/ci/kleaf/patches/0003-kleaf-deduplicate-module-outs.patch" \
-    "$PROJECT_ROOT/ci/kleaf/patches/0004-kleaf-use-kernel-package-root.patch" \
-    "$PROJECT_ROOT/ci/kleaf/patches/0007-kleaf-sun-perf-image-only.patch"; do
-    git -C "$WORKSPACE/msm-kernel" apply --unidiff-zero --check "$patch"
-    git -C "$WORKSPACE/msm-kernel" apply --unidiff-zero "$patch"
-done
-MODULES_PATCH="$PROJECT_ROOT/ci/kleaf/patches/0005-oplus-ufs-sandbox-includes.patch"
-MODULES_TREE="$WORKSPACE/kernel/oneplus/sm8750-modules"
-git -C "$MODULES_TREE" apply --check "$MODULES_PATCH"
-git -C "$MODULES_TREE" apply "$MODULES_PATCH"
-git -C "$MODULES_TREE" diff --check
-python3 "$PROJECT_ROOT/scripts/merge_kconfig.py" \
-    "$WORKSPACE/msm-kernel/arch/arm64/configs/gki_defconfig" \
-    "$PROJECT_ROOT/ci/kleaf/patches/sun-perf-headless.config"
-git -C "$WORKSPACE/msm-kernel" diff --check
-
 export JAVA_HOME="$WORKSPACE/prebuilts/jdk/jdk11/linux-x86"
 export PATH="$JAVA_HOME/bin:$PATH"
 export KLEAF_MAKE_JOBS=1
 cd "$WORKSPACE"
 
-"$WORKSPACE/tools/bazel" \
-    --output_user_root="$RUNNER_TEMP/bazel-cache" \
-    build \
-    --jobs=1 \
-    --color=no \
-    --curses=no \
-    --//msm-kernel:skip_abl=true \
-    --//msm-kernel:skip_dtc=true \
-    --//msm-kernel:skip_abi=true \
-    --user_kmi_symbol_lists=//msm-kernel:android/abi_gki_aarch64_qcom \
-    --ignore_missing_projects \
-    --incompatible_sandbox_hermetic_tmp=false \
-    --nozstd_dwarf_compression \
-    //msm-kernel:sun_perf
+BAZEL="$WORKSPACE/tools/bazel"
+BAZEL_STARTUP_OPTS=(
+    --output_user_root="$RUNNER_TEMP/bazel-cache"
+)
+BAZEL_COMMAND_OPTS=(
+    --jobs=1
+    --color=no
+    --curses=no
+    --ignore_missing_projects
+    --incompatible_sandbox_hermetic_tmp=false
+    --nozstd_dwarf_compression
+)
 
-IMAGE="$WORKSPACE/bazel-bin/msm-kernel/sun_perf/arch/arm64/boot/Image"
+echo "[*] Enforcing the pinned common GKI ABI baseline before Image build."
+"$BAZEL" "${BAZEL_STARTUP_OPTS[@]}" run "${BAZEL_COMMAND_OPTS[@]}" //common:kernel_aarch64_abi_diff
+: > "$ABI_GATE_STATUS"
+echo "[+] Pinned common GKI ABI diff passed with CONFIG_USER_NS=y."
+
+"$BAZEL" "${BAZEL_STARTUP_OPTS[@]}" build "${BAZEL_COMMAND_OPTS[@]}" //common:kernel_aarch64
+
+IMAGE="$WORKSPACE/bazel-bin/common/kernel_aarch64/Image"
 if [ ! -s "$IMAGE" ]; then
-    echo "[!] Bazel succeeded but the expected raw kernel Image is missing: $IMAGE" >&2
+    echo "[!] Bazel succeeded but the expected common GKI Image is missing: $IMAGE" >&2
     exit 1
 fi
-cp -- "$IMAGE" "$ARTIFACT_DIR/Image"
-echo "[+] Raw Image built: $(sha256sum "$ARTIFACT_DIR/Image")"
+: > "$IMAGE_BUILD_STATUS"
+echo "[+] Raw common GKI Image built: $(sha256sum "$IMAGE")"

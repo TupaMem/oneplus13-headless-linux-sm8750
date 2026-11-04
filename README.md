@@ -82,10 +82,11 @@ Do not enable `ENABLE_THERMAL_BYPASS=1` on a device. No flashing instructions ar
 The manual Actions workflow is still an experimental pinned build, not a
 successful Image pipeline. Its latest run (`41781537334`) failed because the
 mixed-tree vendor target cannot produce `vmlinux`; no raw Image was collected.
-The selected next direction is to collect the common GKI base Image, but that
-workflow change is not implemented yet. See
-[`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md). No boot image,
-ABL, ABI validation, GitHub Release, or device operation is included.
+The workflow now sets `CONFIG_USER_NS=y` for the common GKI target, gates on the
+pinned common ABI baseline, then builds the base Image. This candidate has not
+yet passed a new Actions run. It does not validate OnePlus vendor-module KMI.
+See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md). No boot image,
+ABL, GitHub Release, or device operation is included.
 
 ## First device-side step: read-only inventory
 

@@ -1,0 +1,9 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -156,4 +156,5 @@ define_common_kernels(target_configs = {
+     "kernel_aarch64": {
++        "defconfig_fragments": ["arch/arm64/configs/op13_userns.fragment"],
+         "kmi_symbol_list_strict_mode": True,
+         "kmi_symbol_list": "android/abi_gki_aarch64",
+         "additional_kmi_symbol_lists": [":aarch64_additional_kmi_symbol_lists"],

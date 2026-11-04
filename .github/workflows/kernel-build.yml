@@ -1,4 +1,4 @@
-name: OnePlus 13 sun/perf kernel build
+name: OnePlus 13 GKI base Image build
 
 on:
   workflow_dispatch:
@@ -7,12 +7,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: op13-sun-perf-kernel-${{ github.ref }}
+  group: op13-gki-base-image-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   kernel:
-    name: Pinned Kleaf kernel + modules (host only)
+    name: Pinned GKI base Image (host only)
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -47,28 +47,34 @@ jobs:
             bc bison flex gcc g++ make libelf-dev libssl-dev libncurses-dev \
             libcap-dev libxml2-utils rsync unzip zip zstd lz4
 
-      - name: Sync pinned sources and build raw Image
+      - name: Sync sources, ABI-gate and build raw GKI Image
         run: bash ci/kleaf/run_build.sh
         env:
-          KERNEL_WORKSPACE: ${{ runner.temp }}/op13-sun-perf-workspace
-          BUILD_LOG: ${{ runner.temp }}/op13-sun-perf-build.log
-          ARTIFACT_DIR: ${{ runner.temp }}/op13-sun-perf-artifacts
+          KERNEL_WORKSPACE: ${{ runner.temp }}/op13-gki-base-workspace
+          BUILD_LOG: ${{ runner.temp }}/op13-gki-base-image-build.log
+          ARTIFACT_DIR: ${{ runner.temp }}/op13-gki-base-image-artifacts
+          ABI_GATE_STATUS: ${{ runner.temp }}/op13-gki-abi-gate-passed
+          IMAGE_BUILD_STATUS: ${{ runner.temp }}/op13-gki-image-build-passed
+          USERNS_OVERLAY_STATUS: ${{ runner.temp }}/op13-gki-userns-overlay-applied
 
-      - name: Collect build log and non-flashable artifact
+      - name: Collect build log and non-flashable GKI Image
         id: collect
         if: always()
         run: bash ci/kleaf/collect_artifacts.sh
         env:
-          KERNEL_WORKSPACE: ${{ runner.temp }}/op13-sun-perf-workspace
-          BUILD_LOG: ${{ runner.temp }}/op13-sun-perf-build.log
-          ARTIFACT_DIR: ${{ runner.temp }}/op13-sun-perf-artifacts
+          KERNEL_WORKSPACE: ${{ runner.temp }}/op13-gki-base-workspace
+          BUILD_LOG: ${{ runner.temp }}/op13-gki-base-image-build.log
+          ARTIFACT_DIR: ${{ runner.temp }}/op13-gki-base-image-artifacts
+          ABI_GATE_STATUS: ${{ runner.temp }}/op13-gki-abi-gate-passed
+          IMAGE_BUILD_STATUS: ${{ runner.temp }}/op13-gki-image-build-passed
+          USERNS_OVERLAY_STATUS: ${{ runner.temp }}/op13-gki-userns-overlay-applied
 
       - name: Upload build artifact (not a release)
         if: always() && steps.collect.outputs.artifact_files == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: op13-sun-perf-${{ github.run_number }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/op13-sun-perf-artifacts/
+          name: op13-gki-base-image-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/op13-gki-base-image-artifacts/
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
