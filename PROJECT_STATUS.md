@@ -67,7 +67,7 @@ Last host-suite run passed: **20 Python tests**, synthetic patch fixtures, modul
    OPlus device-info/bootmode and QTI charger symbols, plus `make_kuid` and
    `from_kuid_munged` absent from the pinned KMI with `CONFIG_USER_NS=y`.
    The approved direction is Image-only Kleaf, preserving KMI and `USER_NS`.
-   An uncommitted candidate requests only `Image` and omits the sun/perf module
-   outputs; it still needs a real pinned build. The `.113` attempt ended before
-   source sync completed. None of these host builds validates bootability or
+   Commit `25c551f` requests only `Image` and omits the sun/perf module outputs;
+   it still needs a real pinned build. The `.113` attempt ended before source
+   sync completed. None of these host builds validates bootability or
    device-side features.

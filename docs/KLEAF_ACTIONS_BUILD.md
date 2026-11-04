@@ -59,12 +59,12 @@ FBE/KeyMint compatibility, recovery safety, graphics support, or OTA behavior.
 
 Actions run `41669250057` reached module `modpost` but failed with unresolved
 symbols; no `Image` was produced. The pinned GKI KMI does not export
-`make_kuid`/`from_kuid_munged` while this profile enables `USER_NS`. The
-approved follow-up is a Kleaf target that builds only the raw `Image`,
-preserving both the current KMI boundary and `USER_NS`. An uncommitted candidate
-sets `make_goals=["Image"]` and clears the sun/perf module outputs; it has not
-yet passed a pinned Actions build. A successful image build would still not
-validate bootability or device-side behavior.
+`make_kuid`/`from_kuid_munged` while this profile enables `USER_NS`. Commit
+`25c551f` implements the approved Image-only direction, preserving the current
+KMI boundary and `USER_NS`. It sets `make_goals=["Image"]` and clears the
+sun/perf module outputs; it has not yet passed a pinned Actions build. A
+successful image build would still not validate bootability or device-side
+behavior.
 
 ## Local validation without compiling the kernel
 
