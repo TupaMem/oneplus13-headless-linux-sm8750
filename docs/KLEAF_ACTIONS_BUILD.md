@@ -18,14 +18,13 @@ substantial runner disk space.
    `vendor/qcom/kernel/arch/arm64/boot/dts/vendor` workspace path and verifies
    its `BUILD.bazel` and Qualcomm platform map before Bazel starts.
 4. Applies the Kleaf compatibility patches and the small headless Kconfig
-   fragment in `ci/kleaf/patches/`. The image-only target skips vendor module
-   compilation; the pinned UFS include patch is retained in the source inputs
-   for provenance. The fragment keeps the OnePlus UFS profile settings.
-   KernelSU and the optional thermal bypass are not enabled.
-5. Builds only `//msm-kernel:sun_perf` with one Bazel/Kleaf job. The pinned
-   source patch requests `Image` and omits the sun/perf module outputs, avoiding
-   vendor-module `modpost`; ABI, DTC, ABL, boot-image and modules-install targets
-   are excluded. Kleaf may still build its required common base-kernel dependency.
+   fragment in `ci/kleaf/patches/`. KernelSU and the optional thermal bypass are
+   not enabled.
+5. The current candidate asks `//msm-kernel:sun_perf` for `Image` and omits its
+   vendor module outputs. This is not a working path: `sun_perf` uses Kleaf's
+   mixed-tree mode with `//common:kernel_aarch64` as `base_kernel`; Kbuild
+   intentionally omits the `vmlinux` target in mixed-tree mode, so `Image`
+   fails. No successful Image-only workflow target is selected yet.
 6. Uploads a 14-day Actions artifact containing the raw `Image` (if built),
    build log, checksums, source lockfile and build metadata. This is not a
    GitHub Release.
@@ -57,14 +56,16 @@ FBE/KeyMint compatibility, recovery safety, graphics support, or OTA behavior.
 
 ## Current status
 
-Actions run `41669250057` reached module `modpost` but failed with unresolved
-symbols; no `Image` was produced. The pinned GKI KMI does not export
-`make_kuid`/`from_kuid_munged` while this profile enables `USER_NS`. Commit
-`25c551f` implements the approved Image-only direction, preserving the current
-KMI boundary and `USER_NS`. It sets `make_goals=["Image"]` and clears the
-sun/perf module outputs; it has not yet passed a pinned Actions build. A
-successful image build would still not validate bootability or device-side
-behavior.
+Actions run `41669250057` reached vendor-module `modpost` but failed with
+unresolved symbols: the pinned GKI KMI does not export
+`make_kuid`/`from_kuid_munged` while this profile enables `USER_NS`. Follow-up
+run `41781537334` confirmed that `make_goals=["Image"]` cannot be used on the
+mixed-tree `//msm-kernel:sun_perf` target: Kbuild reports `No rule to make
+target 'vmlinux', needed by 'Image'`. Its `//common:kernel_aarch64` dependency
+build completed, but its GKI Image was not collected. Before another expensive
+run, choose whether to package that common GKI Image (the base image paired with
+vendor modules) or design a separate non-mixed `sun_perf` image build. Neither
+path would validate bootability or device-side behavior.
 
 ## Local validation without compiling the kernel
 

@@ -26,7 +26,7 @@ The intended boot design is documented in [`docs/BOOT_FLOW.md`](docs/BOOT_FLOW.m
 - Reframed `runtime/setup_micro_glibc.sh` as a staging helper for an existing AArch64 glibc tree; it fails when the loader or libc is missing and refuses to overwrite a populated destination by default.
 - Added maintainable module sources and deterministic ZIP packaging via `scripts/package_module.py`.
 - Added `docs/BOOT_FLOW.md` and `scripts/android_preflight.sh` as the first implementation phase: capture non-secret device facts before designing the Android unlock/handoff. The preflight has no partition-write or key-reading path.
-- Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. Added a separate manual-only, SHA-pinned Kleaf workflow at `.github/workflows/kernel-build.yml`; it builds only the raw `sun/perf` kernel and modules-install targets on a GitHub-hosted runner. It does not create boot images, include ABL, run ABI validation, publish a Release, or access a device. See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md).
+- Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. Added a separate manual-only, SHA-pinned Kleaf workflow at `.github/workflows/kernel-build.yml`; it attempts a pinned `sun/perf` Kleaf build on a GitHub-hosted runner. It does not create boot images, include ABL, run ABI validation, publish a Release, or access a device. See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md).
 
 ## Tests
 
@@ -66,8 +66,11 @@ Last host-suite run passed: **20 Python tests**, synthetic patch fixtures, modul
    failed at modpost, so no `Image` was produced. Its log reported missing
    OPlus device-info/bootmode and QTI charger symbols, plus `make_kuid` and
    `from_kuid_munged` absent from the pinned KMI with `CONFIG_USER_NS=y`.
-   The approved direction is Image-only Kleaf, preserving KMI and `USER_NS`.
-   Commit `25c551f` requests only `Image` and omits the sun/perf module outputs;
-   it still needs a real pinned build. The `.113` attempt ended before source
-   sync completed. None of these host builds validates bootability or
-   device-side features.
+   Commit `25c551f` tried Image-only on `//msm-kernel:sun_perf`, preserving
+   KMI and `USER_NS`, but run `41781537334` failed: mixed-tree Kbuild has no
+   `vmlinux` rule for that target (`No rule to make target 'vmlinux', needed by
+   'Image'`). The common GKI base target built as a dependency, but its Image was
+   not collected. The artifact model now needs an explicit choice: use the
+   common GKI Image, or design a non-mixed device-kernel build. The `.113`
+   attempt ended before source sync completed. No host build validates
+   bootability or device-side features.
