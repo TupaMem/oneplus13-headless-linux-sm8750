@@ -33,7 +33,7 @@ validated or implemented.
 - Added maintainable module sources and deterministic ZIP packaging via `scripts/package_module.py`.
 - Added `docs/BOOT_FLOW.md` and `scripts/android_preflight.sh` as the first implementation phase: capture non-secret device facts before designing the Android unlock/handoff. The preflight has no partition-write or key-reading path.
 - Recorded Arch Linux ARM as the AArch64 userspace direction and added a staged end-user roadmap. No Arch rootfs or device port exists yet.
-- Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. Added a separate manual-only, SHA-pinned Kleaf workflow at `.github/workflows/kernel-build.yml`; it applies `CONFIG_USER_NS=y` to the pinned common GKI target, enforces its pinned ABI diff, then targets the raw GKI base Image for the planned `sun/perf` port. This revised workflow has not passed an Actions build yet. It does not create boot images, include ABL, validate vendor-module KMI, publish a Release, or access a device. See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md).
+- Replaced the original workflow (which cloned kernel code and ran a remote installer) with offline host checks. Added a separate manual-only, SHA-pinned Kleaf workflow at `.github/workflows/kernel-build.yml`; run `41832263687` successfully applied `CONFIG_USER_NS=y`, passed the pinned common GKI ABI diff, and collected the raw GKI base Image. SHA-256: `bc7e05a335cde38dafe232355d9ac26ce767ffad5f689b98ffec7056d9450d30`. It does not create boot images, include ABL, validate OnePlus vendor-module KMI, publish a Release, or access a device. See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md).
 
 ## Tests
 
@@ -51,7 +51,7 @@ This includes:
 - static checks that the preview module has no partition-write operations or simulated WebUI controls;
 - C build with `-Wall -Wextra -Werror`, AddressSanitizer and UndefinedBehaviorSanitizer, followed by runtime checks for System V IPC cleanup, clock/syscall calls, actual allowed CPU affinity and exact atomic count, and full GEMM result correctness.
 
-Latest host-suite run passed: **22 Python tests**, synthetic patch fixtures, module ZIP rebuild/validation, shell syntax checks, and the sanitized C test binary. Environment: Linux x86_64, GCC 16.2, glibc 2.44, 4 allowed CPUs. The updated workflow passed repository tests, shell parsing, pinned-source manifest checks, and applicability of the USER_NS overlay against the pinned common checkout. `actionlint` was unavailable in this environment. These checks validate host-side behavior only. No successful Kleaf Actions build or target-device preflight has completed. No unlock, handoff, OTA blocking, or partition modification is implemented.
+Latest host-suite run passed: **22 Python tests**, synthetic patch fixtures, module ZIP rebuild/validation, shell syntax checks, and the sanitized C test binary. Environment: Linux x86_64, GCC 16.2, glibc 2.44, 4 allowed CPUs. Run `41832263687` also passed the pinned-source ABI gate and produced the checksummed common GKI Image. `actionlint` was unavailable in the local environment. Host tests and this build do not validate device behavior. No target-device preflight, unlock, handoff, OTA blocking, or partition modification is implemented.
 
 `python3 tests/verify_kernel_patches.py --kernel-tree PATH` checks textual patch applicability against a real checkout without calling that a successful build. Its default synthetic fixture is deliberately not described as a LineageOS tree.
 
@@ -77,8 +77,9 @@ Latest host-suite run passed: **22 Python tests**, synthetic patch fixtures, mod
    KMI and `USER_NS`, but run `41781537334` failed: mixed-tree Kbuild has no
    `vmlinux` rule for that target (`No rule to make target 'vmlinux', needed by
     'Image'`). The common GKI base target built as a dependency, but its Image
-    was not collected. The user selected the common GKI Image; CI now targets
-    that source with a USER_NS overlay and common ABI gate, but no successful
-    revised run has collected it. Arch Linux ARM is the selected userspace base,
-    but no rootfs or device port exists. The `.113` attempt ended before source
-    sync completed. No host build validates bootability or device-side features.
+    was not collected. Run `41832263687` later built the common GKI Image with
+    `CONFIG_USER_NS=y`, passed the common ABI gate, and collected SHA-256
+    `bc7e05a335cde38dafe232355d9ac26ce767ffad5f689b98ffec7056d9450d30`.
+    OnePlus vendor modules, Arch Linux ARM rootfs, and the device port remain
+    unvalidated. The `.113` attempt ended before source sync completed. No host
+    build validates bootability or device-side features.

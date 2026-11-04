@@ -68,11 +68,16 @@ unresolved symbols: the pinned GKI KMI does not export
 run `41781537334` confirmed that `make_goals=["Image"]` cannot be used on the
 mixed-tree `//msm-kernel:sun_perf` target: Kbuild reports `No rule to make
 target 'vmlinux', needed by 'Image'`. Its common dependency completed, but its
-GKI Image was not collected. The updated workflow now applies `CONFIG_USER_NS=y`,
-enforces the pinned common ABI diff, then builds and collects the raw Image.
-This path has not yet passed an Actions run. It does not build or validate the
-Arch Linux ARM rootfs, matching OnePlus vendor modules, bootability, or device
-behavior.
+GKI Image was not collected. New run [`41832263687`](https://github.com/TupaMem/oneplus13-headless-linux-sm8750/actions/runs/41832263687),
+commit `27d4536`, completed successfully: `CONFIG_USER_NS=y` was applied, the
+pinned `//common:kernel_aarch64_abi_diff` gate passed, and the raw Image was
+built and collected. Image SHA-256:
+`bc7e05a335cde38dafe232355d9ac26ce767ffad5f689b98ffec7056d9450d30`.
+The artifact is `op13-gki-base-image-7-1`. This validates the pinned common GKI
+baseline only; it does not build or validate matching OnePlus vendor modules,
+the Arch Linux ARM rootfs, bootability, or device behavior. The ABI log also
+contains STG `multiple IDs found` warnings; the enforced diff nevertheless
+returned success.
 
 ## Local validation without compiling the kernel
 

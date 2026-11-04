@@ -79,14 +79,13 @@ Do not enable `ENABLE_THERMAL_BYPASS=1` on a device. No flashing instructions ar
 
 ## Pinned Kleaf build on GitHub Actions
 
-The manual Actions workflow is still an experimental pinned build, not a
-successful Image pipeline. Its latest run (`41781537334`) failed because the
-mixed-tree vendor target cannot produce `vmlinux`; no raw Image was collected.
-The workflow now sets `CONFIG_USER_NS=y` for the common GKI target, gates on the
-pinned common ABI baseline, then builds the base Image. This candidate has not
-yet passed a new Actions run. It does not validate OnePlus vendor-module KMI.
-See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md). No boot image,
-ABL, GitHub Release, or device operation is included.
+Actions run [`41832263687`](https://github.com/TupaMem/oneplus13-headless-linux-sm8750/actions/runs/41832263687)
+succeeded on commit `27d4536`: `CONFIG_USER_NS=y`, common ABI gate passed, raw
+GKI base `Image` collected. SHA-256:
+`bc7e05a335cde38dafe232355d9ac26ce767ffad5f689b98ffec7056d9450d30`. This is
+not a OnePlus `sun/perf` Image and does not validate vendor-module KMI or
+bootability. See [`docs/KLEAF_ACTIONS_BUILD.md`](docs/KLEAF_ACTIONS_BUILD.md).
+No boot image, ABL, GitHub Release, or device operation is included.
 
 ## First device-side step: read-only inventory
 
