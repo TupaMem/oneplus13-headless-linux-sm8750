@@ -85,13 +85,27 @@ the Arch Linux ARM rootfs, bootability, or device behavior. The ABI log also
 contains STG `multiple IDs found` warnings; the enforced diff nevertheless
 returned success.
 
-The artifact from run `41832263687` predates KMI symvers collection and cannot
-be used for an exact CRC comparison. A subsequent successful run with the
-updated collector must include both `kmi/kernel_aarch64_Module.symvers` and
-`kmi/vmlinux.symvers`; `scripts/check_module_kmi.py` then compares their export
-CRCs with imports and provider CRCs from extracted `vendor_dlkm` and
-`system_dlkm` images. A failed or incomplete comparison is not a vendor-KMI
-pass.
+Run [`41966055592`](https://github.com/TupaMem/oneplus13-headless-linux-sm8750/actions/runs/41966055592),
+commit `cf78b8d`, completed with the updated collector. Its artifact
+`op13-gki-base-image-8-1` contains both symvers files, and all entries in
+`SHA256SUMS` verified. The raw Image SHA-256 is recorded in that artifact.
+Comparing the 587 modules extracted from the matching EvolutionX payload against
+that GKI produced **no vendor KMI pass**: across all 587 vendor/system modules,
+33,128 imports matched, 72 CRC references mismatched across five interconnect
+symbols (`devm_of_icc_get`, `icc_put`, `icc_set_bw`, `icc_set_tag`, `of_icc_get`),
+and eight `zram.ko` imports were unresolved against the GKI tables and extracted
+peer modules. Vendor-only comparison had the same 72 CRC mismatches and no
+unresolved imports; system-only comparison had no CRC mismatches but those eight
+unresolved `zram.ko` imports. There were no conflicting provider CRCs. The
+ROM→GKI CRC pairs were: `devm_of_icc_get` `d9261ec1→cc6ed93c`, `icc_put`
+`a5520429→c3da920e`, `icc_set_bw` `912111d7→54401b7c`, `icc_set_tag`
+`e96fdcf5→27eaa7a4`, and `of_icc_get` `a5fa9ca9→b1cf4f18`.
+
+This is a static ABI metadata incompatibility signal for the tested common GKI
+artifact, not proof about boot behavior or the active device kernel. Do not claim
+OnePlus vendor-module KMI compatibility for this Image. The CRC parser agreed
+with `modprobe --dump-modversions` on all 587 modules; additionally, 4,182
+module-to-module import references matched the parsed peer-export CRCs.
 
 ## Local validation without compiling the kernel
 
@@ -116,6 +130,7 @@ python3 scripts/check_module_kmi.py \
   --symvers /path/to/artifact/kmi/vmlinux.symvers \
   --symvers /path/to/artifact/kmi/kernel_aarch64_Module.symvers \
   --consumer-dir /path/to/modules/vendor_dlkm \
+  --consumer-dir /path/to/modules/system_dlkm \
   --provider-dir /path/to/modules/vendor_dlkm \
   --provider-dir /path/to/modules/system_dlkm
 ```
