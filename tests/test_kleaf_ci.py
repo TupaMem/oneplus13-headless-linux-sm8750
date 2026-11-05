@@ -82,6 +82,14 @@ class KleafActionsTests(unittest.TestCase):
         expected_image = 'IMAGE="$WORKSPACE/bazel-bin/common/kernel_aarch64/Image"'
         self.assertIn(expected_image, script)
         self.assertIn(expected_image, collect)
+        self.assertIn(
+            'GKI_MODULE_SYMVERS="$WORKSPACE/bazel-bin/common/kernel_aarch64/kernel_aarch64_Module.symvers"',
+            collect,
+        )
+        self.assertIn(
+            'VMLINUX_SYMVERS="$WORKSPACE/bazel-bin/common/kernel_aarch64/vmlinux.symvers"',
+            collect,
+        )
         self.assertNotIn("prepare_oplus_workspace.sh", script)
         self.assertNotIn("sun-perf-headless.config", script)
         self.assertNotIn("0007-kleaf-sun-perf-image-only.patch", script)
@@ -95,6 +103,8 @@ class KleafActionsTests(unittest.TestCase):
         self.assertIn("image_source_commit=${KERNEL_COMMON_COMMIT}", collect)
         self.assertIn("abi_gate_target=//common:kernel_aarch64_abi_diff", collect)
         self.assertIn("common_gki_abi_validated=${COMMON_GKI_ABI_VALIDATED}", collect)
+        self.assertIn("gki_kmi_symvers_collected=${KMI_SYMVERS_COLLECTED}", collect)
+        self.assertIn("oneplus_vendor_module_kmi_compared=no", collect)
         self.assertIn("oneplus_vendor_module_kmi_validated=no", collect)
         self.assertIn("user_ns_overlay_applied=${USERNS_OVERLAY_APPLIED}", collect)
         self.assertIn("user_ns_config_verified=${USERNS_CONFIG_VERIFIED}", collect)
@@ -108,9 +118,19 @@ class KleafActionsTests(unittest.TestCase):
         self.assertEqual(userns_fragment, "CONFIG_USER_NS=y\n")
         self.assertIn("op13-gki-base-image-${{ github.run_number }}", workflow)
         self.assertIn("op13-gki-base-image-artifacts/", workflow)
-        self.assertEqual(workflow.count("ABI_GATE_STATUS: ${{ runner.temp }}/op13-gki-abi-gate-passed"), 2)
-        self.assertEqual(workflow.count("USERNS_OVERLAY_STATUS: ${{ runner.temp }}/op13-gki-userns-overlay-applied"), 2)
+        self.assertEqual(
+            workflow.count("ABI_GATE_STATUS: ${{ runner.temp }}/op13-gki-abi-gate-passed"),
+            2,
+        )
+        self.assertEqual(
+            workflow.count("USERNS_OVERLAY_STATUS: ${{ runner.temp }}/op13-gki-userns-overlay-applied"),
+            2,
+        )
         self.assertIn("flashable", (ROOT / "docs/KLEAF_ACTIONS_BUILD.md").read_text())
+        self.assertIn(
+            "kernel_aarch64_Module.symvers",
+            (ROOT / "docs/KLEAF_ACTIONS_BUILD.md").read_text(),
+        )
 
     def test_collector_packages_only_raw_common_image_with_provenance(self):
         with tempfile.TemporaryDirectory(prefix="op13-gki-artifact-test-") as temp:
@@ -121,6 +141,12 @@ class KleafActionsTests(unittest.TestCase):
             image = workspace / "bazel-bin/common/kernel_aarch64/Image"
             image.parent.mkdir(parents=True)
             image.write_bytes(b"synthetic raw GKI Image\x00")
+            (image.parent / "kernel_aarch64_Module.symvers").write_text(
+                "0x12345678\tfixture_symbol\tvmlinux\tEXPORT_SYMBOL\n", encoding="utf-8"
+            )
+            (image.parent / "vmlinux.symvers").write_text(
+                "0x87654321\tfixture_core\tvmlinux\tEXPORT_SYMBOL_GPL\n", encoding="utf-8"
+            )
             for relative in (
                 "common/BUILD.bazel",
                 "common/build.config.gki.aarch64",
@@ -152,11 +178,20 @@ class KleafActionsTests(unittest.TestCase):
             subprocess.run(["bash", str(CI / "collect_artifacts.sh")], env=env, check=True)
 
             self.assertEqual((artifact_dir / "Image").read_bytes(), image.read_bytes())
+            self.assertEqual(
+                (artifact_dir / "kmi/kernel_aarch64_Module.symvers").read_bytes(),
+                (image.parent / "kernel_aarch64_Module.symvers").read_bytes(),
+            )
+            self.assertEqual(
+                (artifact_dir / "kmi/vmlinux.symvers").read_bytes(),
+                (image.parent / "vmlinux.symvers").read_bytes(),
+            )
             info = (artifact_dir / "BUILD_INFO.txt").read_text(encoding="utf-8")
             self.assertIn("build_target=//common:kernel_aarch64", info)
             self.assertIn("image_lineage=common GKI with project CONFIG_USER_NS=y overlay", info)
             self.assertIn("abi_gate_status=pass", info)
             self.assertIn("common_gki_abi_validated=yes", info)
+            self.assertIn("gki_kmi_symvers_collected=yes", info)
             self.assertIn("oneplus_vendor_module_kmi_validated=no", info)
             self.assertIn("user_ns_overlay_applied=yes", info)
             self.assertIn("user_ns_config_verified=yes", info)
@@ -174,6 +209,50 @@ class KleafActionsTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+
+    def test_collector_requires_kmi_symvers_before_packaging_image(self):
+        with tempfile.TemporaryDirectory(prefix="op13-gki-no-symvers-test-") as temp:
+            temp_root = Path(temp)
+            workspace = temp_root / "workspace"
+            runner_temp = temp_root / "runner-temp"
+            artifact_dir = temp_root / "artifact"
+            image = workspace / "bazel-bin/common/kernel_aarch64/Image"
+            image.parent.mkdir(parents=True)
+            image.write_bytes(b"image must wait for KMI symvers")
+            stale_kmi = artifact_dir / "kmi"
+            stale_kmi.mkdir(parents=True)
+            (artifact_dir / "Image").write_bytes(b"stale image")
+            (stale_kmi / "kernel_aarch64_Module.symvers").write_text("stale\n", encoding="utf-8")
+            (stale_kmi / "vmlinux.symvers").write_text("stale\n", encoding="utf-8")
+            runner_temp.mkdir()
+            build_log = runner_temp / "build.log"
+            build_log.write_text("synthetic successful build\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "KERNEL_WORKSPACE": str(workspace),
+                    "RUNNER_TEMP": str(runner_temp),
+                    "BUILD_LOG": str(build_log),
+                    "ARTIFACT_DIR": str(artifact_dir),
+                    "ABI_GATE_STATUS": str(runner_temp / "abi-gate-passed"),
+                    "IMAGE_BUILD_STATUS": str(runner_temp / "image-build-passed"),
+                    "USERNS_OVERLAY_STATUS": str(runner_temp / "userns-overlay-applied"),
+                    "GITHUB_OUTPUT": str(runner_temp / "github-output.txt"),
+                }
+            )
+            Path(env["ABI_GATE_STATUS"]).touch()
+            Path(env["IMAGE_BUILD_STATUS"]).touch()
+            Path(env["USERNS_OVERLAY_STATUS"]).touch()
+            subprocess.run(["bash", str(CI / "collect_artifacts.sh")], env=env, check=True)
+
+            info = (artifact_dir / "BUILD_INFO.txt").read_text(encoding="utf-8")
+            self.assertFalse((artifact_dir / "Image").exists())
+            self.assertFalse((artifact_dir / "kmi/kernel_aarch64_Module.symvers").exists())
+            self.assertFalse((artifact_dir / "kmi/vmlinux.symvers").exists())
+            self.assertIn("gki_kmi_symvers_collected=no", info)
+            self.assertIn("image_collected=no", info)
+            self.assertIn("required GKI KMI symvers output is missing or empty", info)
 
     def test_collector_never_packages_image_without_abi_gate(self):
         with tempfile.TemporaryDirectory(prefix="op13-gki-fail-closed-test-") as temp:

@@ -23,12 +23,16 @@ full Kleaf compile consumes hours and substantial runner disk space.
    difference stops the workflow before the Image build/package step.
 5. Builds `//common:kernel_aarch64`. This is the Android common GKI base, not a
    `sun/perf`-configured Image. Its pinned make-goal list also requests
-   `Image.lz4`, `Image.gz`, and common GKI `modules`; only the raw `Image` is
-   packaged. No OnePlus vendor-module or modules-install target is requested.
+   `Image.lz4`, `Image.gz`, and common GKI `modules`; the raw `Image` is the only
+   kernel image packaged. No OnePlus vendor-module or modules-install target is
+   requested.
    The vendor modules are still required for a complete device port and have
    not been built/validated by this workflow.
-6. Uploads a 14-day Actions artifact containing the raw common GKI `Image`
-   only if the ABI gate and Image build pass, plus build log, checksums, source
+6. Collects `kernel_aarch64_Module.symvers` and `vmlinux.symvers` alongside the
+   raw `Image`. The collector refuses to package `Image` unless the common ABI
+   gate, Image build, and both non-empty symvers outputs are present. The two
+   symbol tables are KMI comparison inputs, not proof that OnePlus vendor KMI
+   passed. A 14-day Actions artifact also contains build logs, checksums, source
    lockfile, overlay patch/fragment, relevant common build inputs, and
    provenance. This is not a GitHub Release.
 
@@ -37,9 +41,11 @@ The artifact is a **raw ARM64 common GKI base Image with a project
 `boot.img`, `vendor_boot.img`, or `init_boot.img`. It is marked `flashable=no`
 and has not been boot-tested. Do not flash it directly. The workflow never
 connects to a phone, reads device secrets, or performs device operations. The
-ABI gate checks the modified common GKI against its pinned baseline; this does
-not establish matching OnePlus vendor-module KMI, FBE/KeyMint compatibility,
-recovery safety, graphics support, or OTA behavior.
+ABI gate checks the modified common GKI against its pinned baseline; the
+collected symvers files allow a separate offline CRC comparison against ROM
+modules but do not themselves establish matching OnePlus vendor-module KMI.
+FBE/KeyMint compatibility, recovery safety, graphics support, and OTA behavior
+remain unvalidated.
 
 ## Pins and changes
 
@@ -79,13 +85,43 @@ the Arch Linux ARM rootfs, bootability, or device behavior. The ABI log also
 contains STG `multiple IDs found` warnings; the enforced diff nevertheless
 returned success.
 
+The artifact from run `41832263687` predates KMI symvers collection and cannot
+be used for an exact CRC comparison. A subsequent successful run with the
+updated collector must include both `kmi/kernel_aarch64_Module.symvers` and
+`kmi/vmlinux.symvers`; `scripts/check_module_kmi.py` then compares their export
+CRCs with imports and provider CRCs from extracted `vendor_dlkm` and
+`system_dlkm` images. A failed or incomplete comparison is not a vendor-KMI
+pass.
+
 ## Local validation without compiling the kernel
 
 ```sh
 bash -n ci/kleaf/*.sh
 python3 -m unittest discover -s tests -v
+python3 scripts/check_module_kmi.py --help
 ```
 
 These checks parse scripts and validate metadata only. Running
 `ci/kleaf/run_build.sh` performs the actual large build and is intended for the
 Actions runner.
+
+## Offline vendor-module KMI comparison
+
+After extracting the exact ROM's `vendor_dlkm` and `system_dlkm` module trees,
+run the CRC checker against both GKI symbol tables from the same Actions
+artifact:
+
+```sh
+python3 scripts/check_module_kmi.py \
+  --symvers /path/to/artifact/kmi/vmlinux.symvers \
+  --symvers /path/to/artifact/kmi/kernel_aarch64_Module.symvers \
+  --consumer-dir /path/to/modules/vendor_dlkm \
+  --provider-dir /path/to/modules/vendor_dlkm \
+  --provider-dir /path/to/modules/system_dlkm
+```
+
+The check compares every vendor module import CRC with either a GKI symvers
+entry or the exact CRC exported by a peer module, and fails on malformed/missing
+inputs, unresolved symbols, provider conflicts, or CRC mismatches. This verifies
+module ABI metadata only; it is not a boot test and must use the same pinned
+common GKI build whose `Image` is under consideration.

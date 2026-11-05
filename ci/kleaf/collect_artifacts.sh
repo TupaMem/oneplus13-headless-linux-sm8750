@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect logs and, on success, only the raw common GKI Image and provenance.
+# Collect logs, the raw common GKI Image, KMI tables, and provenance.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -12,9 +12,15 @@ ABI_GATE_STATUS="${ABI_GATE_STATUS:-$RUNNER_TEMP/op13-gki-abi-gate-passed}"
 IMAGE_BUILD_STATUS="${IMAGE_BUILD_STATUS:-$RUNNER_TEMP/op13-gki-image-build-passed}"
 USERNS_OVERLAY_STATUS="${USERNS_OVERLAY_STATUS:-$RUNNER_TEMP/op13-gki-userns-overlay-applied}"
 IMAGE="$WORKSPACE/bazel-bin/common/kernel_aarch64/Image"
+GKI_MODULE_SYMVERS="$WORKSPACE/bazel-bin/common/kernel_aarch64/kernel_aarch64_Module.symvers"
+VMLINUX_SYMVERS="$WORKSPACE/bazel-bin/common/kernel_aarch64/vmlinux.symvers"
 
-mkdir -p "$ARTIFACT_DIR/logs" "$ARTIFACT_DIR/source-inputs"
-rm -f -- "$ARTIFACT_DIR/Image" "$ARTIFACT_DIR/SHA256SUMS"
+mkdir -p "$ARTIFACT_DIR/logs" "$ARTIFACT_DIR/source-inputs" "$ARTIFACT_DIR/kmi"
+rm -f -- \
+    "$ARTIFACT_DIR/Image" \
+    "$ARTIFACT_DIR/SHA256SUMS" \
+    "$ARTIFACT_DIR/kmi/kernel_aarch64_Module.symvers" \
+    "$ARTIFACT_DIR/kmi/vmlinux.symvers"
 if [ -s "$BUILD_LOG" ]; then
     cp -- "$BUILD_LOG" "$ARTIFACT_DIR/logs/build.log"
 else
@@ -39,6 +45,7 @@ ABI_GATE_RESULT=no
 COMMON_GKI_ABI_VALIDATED=no
 USERNS_OVERLAY_APPLIED=no
 USERNS_CONFIG_VERIFIED=no
+KMI_SYMVERS_COLLECTED=no
 if [ -f "$ABI_GATE_STATUS" ]; then
     ABI_GATE_RESULT=pass
     COMMON_GKI_ABI_VALIDATED=yes
@@ -55,9 +62,16 @@ fi
 BUILD_RESULT="Image not packaged; inspect build status and logs/build.log"
 IMAGE_COLLECTED=no
 if [ "$ABI_GATE_RESULT" = pass ] && [ "$IMAGE_BUILD_SUCCEEDED" = yes ] && [ -s "$IMAGE" ]; then
-    cp -- "$IMAGE" "$ARTIFACT_DIR/Image"
-    BUILD_RESULT="raw common GKI base Image collected"
-    IMAGE_COLLECTED=yes
+    if [ -s "$GKI_MODULE_SYMVERS" ] && [ -s "$VMLINUX_SYMVERS" ]; then
+        cp -- "$GKI_MODULE_SYMVERS" "$ARTIFACT_DIR/kmi/kernel_aarch64_Module.symvers"
+        cp -- "$VMLINUX_SYMVERS" "$ARTIFACT_DIR/kmi/vmlinux.symvers"
+        KMI_SYMVERS_COLLECTED=yes
+        cp -- "$IMAGE" "$ARTIFACT_DIR/Image"
+        BUILD_RESULT="raw common GKI base Image and KMI symvers collected"
+        IMAGE_COLLECTED=yes
+    else
+        BUILD_RESULT="Image not packaged: required GKI KMI symvers output is missing or empty"
+    fi
 elif [ "$ABI_GATE_RESULT" != pass ]; then
     BUILD_RESULT="Image not packaged: common GKI ABI gate did not pass"
 elif [ "$IMAGE_BUILD_SUCCEEDED" != yes ]; then
@@ -67,7 +81,7 @@ else
 fi
 
 cat > "$ARTIFACT_DIR/BUILD_INFO.txt" <<EOF
-artifact_type=raw ARM64 common GKI base Image only
+artifact_type=raw ARM64 common GKI base Image with GKI KMI symvers provenance
 image_lineage=common GKI with project CONFIG_USER_NS=y overlay; not built with the OnePlus sun/perf profile
 image_source_repository=kernel/common
 image_source_commit=${KERNEL_COMMON_COMMIT}
@@ -83,6 +97,10 @@ common_gki_modules_goal_included=yes
 abi_gate_target=//common:kernel_aarch64_abi_diff
 abi_gate_status=${ABI_GATE_RESULT}
 common_gki_abi_validated=${COMMON_GKI_ABI_VALIDATED}
+gki_kmi_symvers_collected=${KMI_SYMVERS_COLLECTED}
+gki_module_symvers_source=common/kernel_aarch64/kernel_aarch64_Module.symvers
+vmlinux_symvers_source=common/kernel_aarch64/vmlinux.symvers
+oneplus_vendor_module_kmi_compared=no
 oneplus_vendor_module_kmi_validated=no
 image_build_succeeded=${IMAGE_BUILD_SUCCEEDED}
 image_collected=${IMAGE_COLLECTED}
@@ -107,11 +125,13 @@ EOF
 cat > "$ARTIFACT_DIR/README.txt" <<'EOF'
 GitHub Actions host-build artifact. Image, when present, is the raw ARM64
 common GKI base Image with a project CONFIG_USER_NS=y fragment, compared
-against the pinned common GKI ABI baseline. It is NOT a OnePlus sun/perf-configured
-Image, and it is NOT boot.img, vendor_boot.img, or init_boot.img. The pinned
-common target also requests common GKI modules, but packages only Image;
-OnePlus sun/perf vendor modules and modules_install were not built. This file
-is not flashable as packaged. No bootloader/ABL target or target-device test was run.
+against the pinned common GKI ABI baseline. When present, the kmi/ directory
+contains Kleaf-generated GKI Module.symvers and vmlinux.symvers tables for a
+separate vendor-module CRC comparison; their presence does not mean OnePlus
+vendor KMI passed. The Image is NOT a OnePlus sun/perf-configured Image, boot.img,
+vendor_boot.img, or init_boot.img. OnePlus sun/perf vendor modules and
+modules_install were not built. This artifact is not flashable. No bootloader/ABL
+target or target-device test was run.
 Verify SHA256SUMS before using or moving any file. This does not establish
 OnePlus compatibility, bootability, matching vendor-module KMI, FBE/KeyMint
 compatibility, recovery safety, graphics support, or OTA behavior.
